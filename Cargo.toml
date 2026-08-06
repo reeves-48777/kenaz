@@ -1,9 +1,9 @@
 [package]
-name = "theme-fixer"
+name = "ztf"
 description = "Fixes incomplete zed theme"
 version = "0.1.0"
 edition = "2024"
-repository = "https://github.com/reeves-48777/theme-fixer"
+repository = "https://github.com/reeves-48777/ztf"
 license = "MIT"
 
 [dependencies]

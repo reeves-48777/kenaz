@@ -1,4 +1,5 @@
-# theme-fixer
+# ZTF (Zed Theme Fixer)
+Anciennement `theme-fixer`
 
 Un petit outil CLI en Rust pour corriger un thème [Zed](https://zed.dev) incomplet, en s'appuyant sur un thème de référence valide.
 
@@ -15,18 +16,36 @@ Un thème Zed personnalisé peut facilement se retrouver avec des tokens manquan
 
 ## Installation
 
+### Binaire précompilé (recommandé)
+
+**Linux / macOS**
+
 ```bash
-git clone https://github.com/reeves-48777/theme-fixer
-cd theme-fixer
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/reeves-48777/ztf/releases/latest/download/theme-fixer-installer.sh | sh
+```
+
+**Windows (PowerShell)**
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/reeves-48777/ztf/releases/latest/download/theme-fixer-installer.ps1 | iex"
+```
+
+Les binaires précompilés pour Linux, macOS (Intel + Apple Silicon) et Windows sont aussi disponibles directement sur la [page des Releases](https://github.com/reeves-48777/theme-fixer/releases).
+
+### Depuis les sources
+
+```bash
+git clone https://github.com/reeves-48777/ztf
+cd ztf
 cargo build --release
 ```
 
-Le binaire est disponible dans `target/release/theme-fixer`.
+Le binaire est disponible dans `target/release/ztf`.
 
 ## Usage
 
 ```bash
-theme-fixer --src <theme_source.json> --dst <theme_a_corriger.json> [--output <chemin_de_sortie.json>]
+ztf --src <theme_source.json> --dst <theme_a_corriger.json> [--output <chemin_de_sortie.json>]
 ```
 
 | Flag | Alias court | Description |
@@ -38,13 +57,13 @@ theme-fixer --src <theme_source.json> --dst <theme_a_corriger.json> [--output <c
 ### Exemple
 
 ```bash
-theme-fixer --src assets/one-dark.json --dst assets/mon-theme.json
+ztf --src assets/one-dark.json --dst assets/mon-theme.json
 ```
 
 Corrige `mon-theme.json` en place, en s'appuyant sur les groupes de couleurs déduits de `one-dark.json`. Un backup `mon-theme.json.bak` est créé avant l'écriture.
 
 ```bash
-theme-fixer --src assets/one-dark.json --dst assets/mon-theme.json --output assets/mon-theme.fixed.json
+ztf --src assets/one-dark.json --dst assets/mon-theme.json --output assets/mon-theme.fixed.json
 ```
 
 Écrit le résultat dans un nouveau fichier, sans toucher à `mon-theme.json`.
@@ -54,7 +73,7 @@ theme-fixer --src assets/one-dark.json --dst assets/mon-theme.json --output asse
 Le niveau de log est contrôlable via la variable d'environnement `RUST_LOG` :
 
 ```bash
-RUST_LOG=debug theme-fixer --src assets/one-dark.json --dst assets/mon-theme.json
+RUST_LOG=debug ztf --src assets/one-dark.json --dst assets/mon-theme.json
 ```
 
 ## Limites connues
