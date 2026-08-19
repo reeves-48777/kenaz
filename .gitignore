@@ -1,2 +1,6 @@
 /target
 .DS_Store
+.env
+**/*.db
+test*.json
+**/assets

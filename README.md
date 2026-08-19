@@ -1,82 +1,81 @@
-# ZTF (Zed Theme Fixer)
-Anciennement `theme-fixer`
+# Kenaz ⚒️
 
-Un petit outil CLI en Rust pour corriger un thème [Zed](https://zed.dev) incomplet, en s'appuyant sur un thème de référence valide.
+## The Editor Theme Forger
 
-## Le problème
+Kenaz is a CLI tool written in Rust that performs Style Transfer for editor themes. Instead of manually defining hundreds of color tokens for your custom theme, you provide a minimal 6-color palette, and Kenaz applies the mathematical DNA of existing themes to it.
 
-Un thème Zed personnalisé peut facilement se retrouver avec des tokens manquants (`border.disabled`, `terminal.ansi.red`, etc.) — souvent parce qu'ils ont été oubliés lors de la création manuelle du fichier. Plutôt que de les définir un par un à la main, `theme-fixer` déduit les valeurs manquantes à partir d'un thème source qui, lui, les définit tous.
+## The Evolution: From ZTF to Kenaz
 
-## Comment ça marche
+This project started as ZTF (Zed Theme Fixer), a simple script designed to fill in missing tokens in incomplete Zed themes. However, it quickly became apparent that guessing missing colors wasn't enough—we wanted to forge new themes from scratch.
 
-1. Le thème **source** (un thème officiel Zed, complet) est analysé : les tokens qui partagent la même couleur sont regroupés ensemble.
-2. Le thème **destination** (celui à corriger) est parcouru groupe par groupe : si au moins un token du groupe a déjà une couleur définie dans la destination, cette couleur sert d'ancre et est appliquée aux autres tokens du même groupe qui existent dans le fichier mais n'ont pas de valeur.
-3. Un backup du fichier original est créé avant toute écriture (si la sortie remplace la destination).
-4. Le thème corrigé est écrit sur disque.
+The project was renamed Kenaz, after the Norse rune representing the torch, illumination, and the forge. It symbolizes bringing light and structure to colors. 
 
-## Installation
+Furthermore, Kenaz is built to be editor-agnostic. While it currently targets Zed, the core architecture (engrams, Oklab math, SQLite persistence) is completely decoupled from the editor's schema. The vision is to expand to Helix, Neovim, and other editors in the future.
 
-### Binaire précompilé (recommandé)
+## How it works
 
-**Linux / macOS**
+Kenaz doesn't just do a 1:1 color replacement. It performs Luminance-Only Style Transfer:
+1. Extraction (--build-engrams): Kenaz scrapes the Zed ecosystem, extracts the mathematical DNA (how each token relates to the 6 base anchor colors in the Oklab color space), and stores it in a local SQLite database.
+2. Forging: You provide a palette.toml with 6 colors (bg, fg, accent, success, warning, error). Kenaz loads a style's DNA from the database, finds the original theme's JSON to use as a "canvas", and recursively replaces the colors by applying the style's lightness deltas (delta_l) to your palette.
+3. Result: A complete theme that respects your palette's identity (Hue/Chroma) while perfectly adopting the structural depth (shadows, popups, syntax contrasts) of the source theme.
 
-```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/reeves-48777/ztf/releases/latest/download/theme-fixer-installer.sh | sh
-```
+## 🚀 Installation
+### From source (with Dev Tools)
 
-**Windows (PowerShell)**
-
-```powershell
-powershell -ExecutionPolicy Bypass -c "irm https://github.com/reeves-48777/ztf/releases/latest/download/theme-fixer-installer.ps1 | iex"
-```
-
-Les binaires précompilés pour Linux, macOS (Intel + Apple Silicon) et Windows sont aussi disponibles directement sur la [page des Releases](https://github.com/reeves-48777/theme-fixer/releases).
-
-### Depuis les sources
-
-```bash
-git clone https://github.com/reeves-48777/ztf
-cd ztf
+```bash 
+git clone https://github.com/reeves-48777/kenaz
+cd kenaz
 cargo build --release
 ```
-
-Le binaire est disponible dans `target/release/ztf`.
-
-## Usage
+*Note: To build the database of styles, you need to compile with the dev-tools feature and fetch the themes:*
 
 ```bash
-ztf --src <theme_source.json> --dst <theme_a_corriger.json> [--output <chemin_de_sortie.json>]
+cargo run --features dev-tools -- --build-engrams
 ```
+ 
+## 🛠️ Usage
+### 1. Define your palette
 
-| Flag | Alias court | Description |
-|---|---|---|
-| `--src` | `-s` | Thème source valide (fait par l'équipe Zed), sert de référence pour déduire les couleurs manquantes |
-| `--dst` | `-d` | Thème à corriger, peut contenir des tokens manquants |
-| `--output` | `-o` | Chemin de sortie (optionnel — par défaut, écrase le fichier `--dst` après en avoir fait un backup `.bak`) |
+Create a `palette.toml` file:
 
-### Exemple
+```toml
+[meta]
+name = "MyTheme"
 
+[[variants]]
+name = "MyTheme Dark"
+mode = "dark"
+
+[variants.colors]
+bg = "#1e1e2e"
+fg = "#cdd6f4"
+accent = "#89b4fa"
+success = "#a6e3a1"
+warning = "#f9e2af"
+error = "#f38ba8"
+```
+ 
+### 2. Forge your theme
+
+```bash  
+kenaz palette.toml output.json -e "One Dark"
+```
+ 
+### 3. Other commands
+
+List all available styles in your database:
 ```bash
-ztf --src assets/one-dark.json --dst assets/mon-theme.json
+kenaz --list-engrams
 ```
+ 
+## 🗺️ Roadmap
 
-Corrige `mon-theme.json` en place, en s'appuyant sur les groupes de couleurs déduits de `one-dark.json`. Un backup `mon-theme.json.bak` est créé avant l'écriture.
+Kenaz is fully functional for V1, but here is what's planned for the future:
+- [x] V1 - Core Engine: Oklab style transfer, SQLite persistence, proc-macro schema traversal.
+- [ ] V1.1 - Persistent Cache & Auto-Download: Pre-build the engrams.db for GitHub releases and auto-download it on first run (removing the need for users to compile with dev-tools).
+- [ ] V2.0 - Terminal UI (TUI): Interactive interface using ratatui to browse styles, preview palettes, and generate themes without leaving the terminal.
+- [ ] V2.5 - DataViz & Clustering: Run K-Means on the SQLite database to find "Meta-Styles" (e.g., generating a theme based on the mathematical average of all Dark themes).
 
-```bash
-ztf --src assets/one-dark.json --dst assets/mon-theme.json --output assets/mon-theme.fixed.json
-```
+## 📖 Architecture
 
-Écrit le résultat dans un nouveau fichier, sans toucher à `mon-theme.json`.
-
-### Logs
-
-Le niveau de log est contrôlable via la variable d'environnement `RUST_LOG` :
-
-```bash
-RUST_LOG=debug ztf --src assets/one-dark.json --dst assets/mon-theme.json
-```
-
-## Limites connues
-
-- Un token qui n'appartient à aucun groupe partagé (couleur unique dans le thème source) ne peut pas être déduit automatiquement — il reste tel quel dans la destination.
-- L'outil ne devine pas de nouvelles couleurs : il ne fait que propager des couleurs déjà présentes ailleurs dans le fichier de destination.
+For a deep dive into the technical decisions (proc-macros, typify code generation, and Oklab math), please read the [ARCHITECTURE.md.](ARCHITECTURE.md)

@@ -1,0 +1,21 @@
+[package]
+name = "kenaz"
+description = "Generate themes from a semantic color palette"
+version = "0.2.0"
+edition = "2024"
+repository = "https://github.com/reeves-48777/kenaz"
+license = "MIT"
+
+[dependencies]
+kenaz_core = { path = "../kenaz_core" }
+clap = { version = "4.6.5", features = ["derive"] }
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+rusqlite.workspace = true
+toml = "1.1.4"
+serde_json.workspace = true
+
+[features]
+dev-tools = ["kenaz_core/dev-tools"]
