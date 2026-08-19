@@ -199,6 +199,9 @@ impl EngramBuilder {
         use std::sync::Arc;
         use tokio::{sync::Semaphore, task::JoinSet};
 
+        // fetching official zed themes
+        self.fetch_official_themes().await?;
+
         // we get repos lists here from zed api
         let repos: ExtensionResponse = self
             .client
@@ -304,6 +307,53 @@ impl EngramBuilder {
             .collect();
 
         Ok(theme_files)
+    }
+
+    /// Fetches official base themes from the Zed repository
+    async fn fetch_official_themes(&mut self) -> anyhow::Result<()> {
+        tracing::info!("Fetching official Zed themes...");
+        let tree_url = "https://api.github.com/repos/zed-industries/zed/git/trees/main?recursive=1";
+
+        let response: TreeResponse = self
+            .client
+            .as_ref()
+            .unwrap()
+            .get(tree_url)
+            .send()
+            .await?
+            .json()
+            .await?;
+
+        let styles_dir = util::styles_dir();
+        let repo_dir = styles_dir.join("zed_official");
+        std::fs::create_dir_all(&repo_dir)?;
+
+        for entry in response.tree {
+            // we only use .json files in assets/themes
+            if entry.r#type == "blob"
+                && entry.path.contains("assets/themes")
+                && entry.path.ends_with(".json")
+            {
+                let raw_url = format!(
+                    "https://raw.githubusercontent.com/zed-industries/zed/main/{}",
+                    entry.path
+                );
+                let content = self
+                    .client
+                    .as_ref()
+                    .unwrap()
+                    .get(&raw_url)
+                    .send()
+                    .await?
+                    .text()
+                    .await?;
+
+                let file_name = entry.path.rsplit('/').next().unwrap_or("theme.json");
+                std::fs::write(repo_dir.join(file_name), content)?;
+            }
+        }
+        tracing::info!("Official Zed themes fetched.");
+        Ok(())
     }
 }
 
