@@ -10,11 +10,6 @@
 //! - `kenaz --list-engrams`: Lists all available styles in the database.
 //! - `kenaz --build-engrams` (dev only): Scrapes GitHub and builds the database.
 //!
-//! ## Architecture Note
-//! The `#[tokio:main]` async runtime is currently used globally. In the future,
-//! it could be scoped exclusively behind the `dev-tools` feature (which requires
-//! async network requests). The standard theme generation flows is purely synchronous
-//! (TOML parsing, SQLite read, JSON write) and does not need an async runtime.
 
 mod app;
 mod cli;
@@ -29,8 +24,7 @@ use kenaz_core::util;
 ///
 /// Initialized logging, parses command-line arguments, and routes execution
 /// to the appropriate subcommand (build database, list styles, or forge theme).
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     // Initialize the logger with the verbosity level requested by the user
@@ -42,12 +36,15 @@ async fn main() -> anyhow::Result<()> {
     // 1.Developer Tools: Build the engram database from Zed's ecosystem
     #[cfg(feature = "dev-tools")]
     if cli.build_engrams {
-        use kenaz_core::engram::devtools::EngramBuilder;
-        EngramBuilder::ensure_dot_env();
-        let mut eb = EngramBuilder::new()
-            .skip_fetch(cli.skip_fetch)
-            .try_init_client()?;
-        eb.build_engrams().await?;
+        let rt = tokio::runtime::Runtime::new()?;
+        rt.block_on(async {
+            use kenaz_core::engram::devtools::EngramBuilder;
+            EngramBuilder::ensure_dot_env();
+            let mut eb = EngramBuilder::new()
+                .skip_fetch(cli.skip_fetch)
+                .try_init_client()?;
+            eb.build_engrams().await
+        })?;
         return Ok(());
     }
 

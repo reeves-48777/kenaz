@@ -18,7 +18,7 @@ dotenvy = { version = "0.15.7", optional = true }
 rayon = "1.12.0"
 strum = { version = "0.28.0", features = ["derive"] }
 tracing.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, optional = true }
 
 
 [build-dependencies]
@@ -34,4 +34,4 @@ kenaz_macros = { path = "../kenaz_macros"}
 
 
 [features]
-dev-tools = ["dep:reqwest", "dep:dotenvy"]
+dev-tools = ["dep:reqwest", "dep:dotenvy", "dep:tokio"]
