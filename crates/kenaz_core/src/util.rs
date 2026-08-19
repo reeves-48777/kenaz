@@ -33,8 +33,11 @@ pub fn engrams_db_path() -> PathBuf {
 /// This is primarily used by the `dev-tools` feature to store downloaded repositories
 /// before extracting their engrams.
 pub fn styles_dir() -> PathBuf {
-    let tmp = std::env::temp_dir().join("kenaz").join("fetched_styles");
-    tmp
+    let base = dirs::cache_dir().unwrap_or_else(|| {
+        tracing::warn!("Could not get cache directory, falling back to current directory...");
+        std::env::current_dir().expect("Successfully got current directory")
+    });
+    base.join("kenaz").join("fetched_styles")
 }
 
 /// Normalizes a theme name for consistent database lookup and comparison
