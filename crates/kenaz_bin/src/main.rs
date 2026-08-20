@@ -34,14 +34,8 @@ fn main() -> anyhow::Result<()> {
         .from_env_lossy();
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    // Determine if the user is running a dev command
-    #[cfg(feature = "dev-tools")]
-    let is_dev_cmd = matches!(cli.command, Commands::Dev { .. });
-    #[cfg(not(feature = "dev-tools"))]
-    let is_dev_cmd = false;
-
     // 0. Zero friction setup: auto download the database and styles if missing
-    if !is_dev_cmd && !engram::db::path().exists() {
+    if !cli.command.prevents_autosync() && !engram::db::path().exists() {
         sync::sync_repo(false)?;
     }
 
@@ -75,19 +69,38 @@ fn main() -> anyhow::Result<()> {
             use cli::DocActions;
             match action {
                 DocActions::ShowPath => {
+                    let mut print_help = false;
+                    let mut missing = Vec::new();
                     let cache_dir = util::cache_dir();
                     if cache_dir.exists() && cache_dir.is_dir() {
                         println!("Cache directory at: {:?}", cache_dir);
+                    } else {
+                        print_help = true;
+                        missing.push(cache_dir);
                     }
 
                     let engrams_db_path = engram::db::path();
                     if engrams_db_path.exists() && engrams_db_path.is_file() {
                         println!("Engrams database at: {:?}", engrams_db_path);
+                    } else {
+                        print_help = true;
+                        missing.push(engrams_db_path);
                     }
 
                     let styles_dir = util::styles_dir();
                     if styles_dir.exists() && styles_dir.is_dir() {
                         println!("Styles directory at: {:?}", styles_dir);
+                    } else {
+                        print_help = true;
+                        missing.push(styles_dir);
+                    }
+
+                    if print_help {
+                        println!("Kenaz cache missing :");
+                        for path in missing {
+                            println!("\t- {}", path.to_string_lossy());
+                        }
+                        println!("Try `kenaz sync` to build them");
                     }
                 }
             }

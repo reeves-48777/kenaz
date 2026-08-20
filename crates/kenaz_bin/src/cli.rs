@@ -64,6 +64,21 @@ pub enum Commands {
     },
 }
 
+impl Commands {
+    /// Returns true if the command should prevent the auto-sync mechanism.
+    ///
+    /// Commands like `sync`, `clean`, `doc` or `dev` don't need the database
+    /// to be downloaded automatically if it's missing.
+    pub fn prevents_autosync(&self) -> bool {
+        match self {
+            Commands::Sync { .. } | Commands::Clean | Commands::Doc { .. } => true,
+            #[cfg(feature = "dev-tools")]
+            Commands::Dev { .. } => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, Subcommand)]
 #[cfg(feature = "dev-tools")]
 pub enum DevActions {

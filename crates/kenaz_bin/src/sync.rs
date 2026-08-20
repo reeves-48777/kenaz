@@ -1,21 +1,24 @@
 use anyhow::Context;
 use std::path::Path;
 
-const FULL_PACK_URL: &'static str =
-    "https://github.com/reeves-48777/kenaz/releases/download/v1.0.0/kenaz_full_pack.tar.gz";
-const CURATED_PACK_URL: &'static str =
-    "https://github.com/reeves-48777/kenaz/releases/download/v1.0.0/kenaz_curated_pack.tar.gz";
+const FULL_PACK_NAME: &'static str = "kenaz_full_pack.tar.gz";
+const CURATED_PACK_NAME: &'static str = "kenaz_curated_pack.tar.gz";
 
 /// Synchronizes kenaz pack
 pub fn sync_repo(full: bool) -> anyhow::Result<()> {
     let cache_dir = kenaz_core::util::cache_dir();
-    let pack_url = if full {
-        FULL_PACK_URL
+
+    let version = env!("CARGO_PKG_VERSION");
+    let pack_name = if full {
+        FULL_PACK_NAME
     } else {
-        CURATED_PACK_URL
+        CURATED_PACK_NAME
     };
 
-    if let Err(e) = download_and_extract_pack(pack_url, &cache_dir) {
+    let pack_url =
+        format!("https://github.com/reeves-48777/kenaz/releases/download/v{version}/{pack_name}");
+
+    if let Err(e) = download_and_extract_pack(&pack_url, &cache_dir) {
         tracing::error!("Could not download initial database: {e}");
         anyhow::bail!("Please try again or build the database manually with --build-engrams")
     }
