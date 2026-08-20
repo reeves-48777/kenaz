@@ -1,7 +1,7 @@
 [package]
 name = "kenaz"
 description = "Generate themes from a semantic color palette"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2024"
 repository = "https://github.com/reeves-48777/kenaz"
 license = "MIT"

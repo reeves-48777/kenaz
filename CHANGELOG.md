@@ -2,8 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.0] - 2026-08-20
+## [1.0.2] - 2026-08-20
+### Fixed
+- Auto-sync bug: Diagnostic and maintenance commands (kenaz clean, kenaz doc, kenaz sync) no longer trigger the automatic database download if the cache is missing.
+- Doctor show-path: The kenaz doc show-path command now correctly checks if the cache files and directories actually exist before printing their paths, warning the user if they are missing.
+- Dynamic Sync URL: The sync module now dynamically uses CARGO_PKG_VERSION to fetch the correct pack for the installed version, preventing future compatibility issues with hardcoded URLs.
 
+### Changed
+- CLI Refactor: Refactored the auto-sync prevention logic into a clean Commands::prevents_autosync() method within cli.rs.
+
+## [1.0.0] - 2026-08-20
 ### Added
 - **Style Transfer Engine**: Kenaz now performs Luminance-only style transfer in the Oklab color space, modifying only the L channel to preserve palette's identity.
 - **SQLite Persistence**: Engrams (style vectors) are stored in a local SQLite databse for fast querying.
