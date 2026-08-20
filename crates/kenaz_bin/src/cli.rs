@@ -12,7 +12,7 @@ use std::path::PathBuf;
 #[command(version, about, long_about = None)]
 pub struct Cli {
     /// Verbosity
-    #[arg(short, long, action = clap::ArgAction::Count)]
+    #[arg(short, long, global = true, action = clap::ArgAction::Count)]
     pub verbose: u8,
 
     #[command(subcommand)]

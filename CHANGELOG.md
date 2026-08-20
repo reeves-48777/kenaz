@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2026-08-20
+### Fixed
+- Curated Export Bug: Fixed an issue where a missing ! in the is_file() check caused the export process to silently skip all JSON files, resulting in an empty curated database.
+- Case-Insensitive Folders: Curated repository folder names are now matched case-insensitively to ensure all repos (e.g., "Catppuccin" vs "catppuccin") are properly included in the export.
+
+### Changed
+- Global Verbosity Flag: The --verbose (-v) CLI flag is now global = true, allowing users to place it anywhere in the command (e.g., kenaz dev export -vvv).
+
 ## [1.0.2] - 2026-08-20
 ### Fixed
 - Auto-sync bug: Diagnostic and maintenance commands (kenaz clean, kenaz doc, kenaz sync) no longer trigger the automatic database download if the cache is missing.
