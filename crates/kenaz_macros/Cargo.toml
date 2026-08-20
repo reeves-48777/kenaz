@@ -2,6 +2,7 @@
 name = "kenaz_macros"
 version = "0.1.0"
 edition = "2024"
+homepage = "https://github.com/reeves-48777/kenaz"
 
 [lib]
 proc-macro = true

@@ -1,8 +1,9 @@
 [package]
 name = "kenaz_core"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2024"
 build = "build.rs"
+homepage = "https://github.com/reeves-48777/kenaz"
 
 [dependencies]
 kenaz_macros = { path = "../kenaz_macros" }
