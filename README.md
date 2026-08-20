@@ -71,6 +71,11 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/reeves-48777/kenaz/rele
 powershell -ExecutionPolicy Bypass -c "irm https://github.com/reeves-48777/kenaz/releases/latest/download/kenaz-installer.ps1 | iex"
 ```
 
+### Via Homebrew
+```bash
+brew install reeves-48777/kenaz/kenaz.rb
+```
+
 ### From source (with Dev Tools)
 ```bash 
 git clone https://github.com/reeves-48777/kenaz
