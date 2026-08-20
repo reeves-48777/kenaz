@@ -19,3 +19,4 @@ install-updater = false
 tap = "reeves-48777/homebrew-kenaz"
 # formula
 formula = "kenaz.rb"
+publish-jobs = ["homebrew"]
