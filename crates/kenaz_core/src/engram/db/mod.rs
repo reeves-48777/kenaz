@@ -99,3 +99,15 @@ pub fn get_by_theme_name_and_variant(
 
     Ok(engram)
 }
+
+/// Resolves the path to the `engrams.db` SQLite database
+///
+/// It attempts to use the OS-specific local data directory. If unavailable,
+/// it falls back to the general data directory, and finally to the current
+/// working director as a last resort.
+pub fn path() -> std::path::PathBuf {
+    use crate::util::cache_dir;
+    let mut path = cache_dir();
+    path.push("engrams.db");
+    path
+}

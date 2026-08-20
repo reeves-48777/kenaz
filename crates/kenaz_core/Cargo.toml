@@ -1,6 +1,6 @@
 [package]
 name = "kenaz_core"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 build = "build.rs"
 
@@ -19,6 +19,8 @@ rayon = "1.12.0"
 strum = { version = "0.28.0", features = ["derive"] }
 tracing.workspace = true
 tokio = { workspace = true, optional = true }
+tar.workspace = true
+flate2.workspace = true
 
 
 [build-dependencies]

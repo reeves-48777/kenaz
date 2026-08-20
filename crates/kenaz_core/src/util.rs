@@ -6,38 +6,24 @@
 
 use std::path::PathBuf;
 
-/// Resolves the path to the `engrams.db` SQLite database
+/// Returns the root cache directory
 ///
-/// It attempts to use the OS-specific local data directory. If unavailable,
-/// it falls back to the general data directory, and finally to the current
-/// working director as a last resort.
-pub fn engrams_db_path() -> PathBuf {
-    let mut path = dirs::data_local_dir()
-        .or_else(|| {
-            tracing::info!("Could not get data local directory, trying data directory instead...");
-            dirs::data_dir()
-        })
-        .unwrap_or_else(|| {
-            tracing::warn!("Could not get data directory either, using current directory...");
-            std::env::current_dir().expect("Successfully got current directory")
-        });
+/// This directory is the parent of the downloaded pack
+/// holding the engrams.db SQLite database and styles directory
+pub fn cache_dir() -> PathBuf {
+    let mut path = dirs::cache_dir().expect("Successfully got cache directory");
     path.push("kenaz");
-    path.push("engrams.db");
-
-    tracing::info!("Using engram database at: {path:?}");
     path
 }
 
-/// Returns the temporary directory used to cache raw JSON themes fetched from Github.
+/// Returns the directory used to cache raw JSON themes fetched from Github.
 ///
 /// This is primarily used by the `dev-tools` feature to store downloaded repositories
 /// before extracting their engrams.
 pub fn styles_dir() -> PathBuf {
-    let base = dirs::cache_dir().unwrap_or_else(|| {
-        tracing::warn!("Could not get cache directory, falling back to current directory...");
-        std::env::current_dir().expect("Successfully got current directory")
-    });
-    base.join("kenaz").join("fetched_styles")
+    let mut path = cache_dir();
+    path.push("styles");
+    path
 }
 
 /// Normalizes a theme name for consistent database lookup and comparison

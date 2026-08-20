@@ -1,7 +1,7 @@
 [package]
 name = "kenaz"
 description = "Generate themes from a semantic color palette"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2024"
 repository = "https://github.com/reeves-48777/kenaz"
 license = "MIT"
@@ -13,9 +13,12 @@ anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 rusqlite.workspace = true
+reqwest = { workspace = true, features = ["blocking"] }
 toml = "1.1.4"
 serde_json.workspace = true
 tokio = { workspace = true, optional = true }
+tar.workspace = true
+flate2.workspace = true
 
 [features]
 dev-tools = ["kenaz_core/dev-tools", "dep:tokio"]

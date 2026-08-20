@@ -6,19 +6,20 @@
 //! DNA (engrams) of existing themes and applies them to custom, minimal color palettes.
 //!
 //! ## Commands
-//! - `kenaz my_palette.toml output.json -e/--engram "One"`: Generates a theme based on One.
-//! - `kenaz --list-engrams`: Lists all available styles in the database.
-//! - `kenaz --build-engrams` (dev only): Scrapes GitHub and builds the database.
+//! - `kenaz forge <my_palette.toml> <output.json> -e/--engram "One"`: Generates a theme based on One.
+//! - `kenaz list`: Lists all available styles in the database.
+//! - `kenaz dev build` (dev only): Scrapes GitHub and builds the database.
+//! - `kenaz dev export` (dev only): Exports a `.tar.gz` pack for releases.
 //!
 
 mod app;
 mod cli;
 mod log;
+mod sync;
 
-use app::App;
 use clap::Parser;
-use cli::Cli;
-use kenaz_core::util;
+use cli::{Cli, Commands};
+use kenaz_core::{engram, util};
 
 /// The main entry point of the CLI.
 ///
@@ -33,36 +34,93 @@ fn main() -> anyhow::Result<()> {
         .from_env_lossy();
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    // 1.Developer Tools: Build the engram database from Zed's ecosystem
+    // Determine if the user is running a dev command
     #[cfg(feature = "dev-tools")]
-    if cli.build_engrams {
-        let rt = tokio::runtime::Runtime::new()?;
-        rt.block_on(async {
-            use kenaz_core::engram::devtools::EngramBuilder;
-            EngramBuilder::ensure_dot_env();
-            let mut eb = EngramBuilder::new()
-                .skip_fetch(cli.skip_fetch)
-                .try_init_client()?;
-            eb.build_engrams().await
-        })?;
-        return Ok(());
+    let is_dev_cmd = matches!(cli.command, Commands::Dev { .. });
+    #[cfg(not(feature = "dev-tools"))]
+    let is_dev_cmd = false;
+
+    // 0. Zero friction setup: auto download the database and styles if missing
+    if !is_dev_cmd && !engram::db::path().exists() {
+        sync::sync_repo(false)?;
     }
 
-    // 2. Utility: List available engrams directly from the SQLite databse
-    if cli.list_engrams {
-        use kenaz_core::engram::prelude::list_engrams;
-        let conn = rusqlite::Connection::open(util::engrams_db_path())?;
-        list_engrams(&conn)?;
-        return Ok(());
-    }
+    // Route execution based on the parsed subcommand
+    match cli.command {
+        Commands::Forge {
+            palette,
+            output,
+            engram,
+            force,
+        } => {
+            let mut app = app::App::new();
+            app.try_build_context(palette, output, engram, force)?;
+            app.build_theme()?;
+        }
+        Commands::List => {
+            let conn = rusqlite::Connection::open(engram::db::path())?;
+            engram::db::list_engrams(&conn)?;
+        }
+        Commands::Sync { full } => {
+            sync::sync_repo(full)?;
+        }
+        Commands::Clean => {
+            let cache_dir = util::cache_dir();
+            std::fs::remove_dir_all(&cache_dir)?;
+            std::fs::create_dir_all(&cache_dir)?;
 
-    // 3. Default Action: Forge a new theme using the provided palette, style and output path
-    let mut app = App::new(
-        cli.engram,
-        cli.output.expect("output path passed as argument"),
-    );
-    app.parse_palette(cli.palette.expect("palette passed as argument"))?;
-    app.build_theme()?;
+            tracing::info!("Cache cleaned successfully!");
+        }
+        Commands::Doc { action } => {
+            use cli::DocActions;
+            match action {
+                DocActions::ShowPath => {
+                    let cache_dir = util::cache_dir();
+                    if cache_dir.exists() && cache_dir.is_dir() {
+                        println!("Cache directory at: {:?}", cache_dir);
+                    }
+
+                    let engrams_db_path = engram::db::path();
+                    if engrams_db_path.exists() && engrams_db_path.is_file() {
+                        println!("Engrams database at: {:?}", engrams_db_path);
+                    }
+
+                    let styles_dir = util::styles_dir();
+                    if styles_dir.exists() && styles_dir.is_dir() {
+                        println!("Styles directory at: {:?}", styles_dir);
+                    }
+                }
+            }
+        }
+        #[cfg(feature = "dev-tools")]
+        Commands::Dev { action } => {
+            use cli::DevActions;
+            use engram::devtools::EngramBuilder;
+
+            match action {
+                DevActions::Build { skip_fetch } => {
+                    let rt = tokio::runtime::Runtime::new()?;
+                    rt.block_on(async {
+                        EngramBuilder::ensure_dot_env();
+                        let mut eb = EngramBuilder::new()
+                            .skip_fetch(skip_fetch)
+                            .try_init_client()?;
+                        eb.build_engrams().await
+                    })?;
+                }
+                DevActions::Export { full } => {
+                    let source_db = engram::db::path();
+                    let output_archive = if full {
+                        std::path::PathBuf::from("./kenaz_full_pack.tar.gz")
+                    } else {
+                        std::path::PathBuf::from("./kenaz_curated_pack.tar.gz")
+                    };
+                    tracing::info!("Exporting to {output_archive:?}");
+                    engram::devtools::export_pack(&source_db, &output_archive, full)?;
+                }
+            }
+        }
+    }
 
     Ok(())
 }

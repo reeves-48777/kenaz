@@ -18,6 +18,8 @@ proc-macro2 = "1.0.107"
 quote = "1.0.47"
 syn = { version = "3.0.3", features = ["full", "parsing", "visit-mut"] }
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros"] }
+tar = "0.4.46"
+flate2 = "1.1.9"
 
 # The profile that 'dist' will build with
 [profile.dist]
