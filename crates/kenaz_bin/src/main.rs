@@ -108,18 +108,13 @@ fn main() -> anyhow::Result<()> {
         #[cfg(feature = "dev-tools")]
         Commands::Dev { action } => {
             use cli::DevActions;
-            use engram::devtools::EngramBuilder;
+            use engram::devtools::prelude::*;
 
             match action {
                 DevActions::Build { skip_fetch } => {
-                    let rt = tokio::runtime::Runtime::new()?;
-                    rt.block_on(async {
-                        EngramBuilder::ensure_dot_env();
-                        let mut eb = EngramBuilder::new()
-                            .skip_fetch(skip_fetch)
-                            .try_init_client()?;
-                        eb.build_engrams().await
-                    })?;
+                    EngramBuilder::ensure_dot_env();
+                    let mut eb = EngramBuilder::new().skip_fetch(skip_fetch);
+                    eb.build_engrams()?;
                 }
                 DevActions::Export { full } => {
                     let source_db = engram::db::path();
@@ -129,7 +124,7 @@ fn main() -> anyhow::Result<()> {
                         std::path::PathBuf::from("./kenaz_curated_pack.tar.gz")
                     };
                     tracing::info!("Exporting to {output_archive:?}");
-                    engram::devtools::export_pack(&source_db, &output_archive, full)?;
+                    export_pack(&source_db, &output_archive, full)?;
                 }
             }
         }

@@ -6,7 +6,7 @@
 //! The final code is written to `OUT_DIR/schema.rs` to be included in the crate.
 
 use std::{env, fs, path::Path};
-use syn::{parse_file, visit_mut::VisitMut};
+use syn::{parse2, visit_mut::VisitMut};
 use typify::{TypeSpace, TypeSpaceSettings};
 
 /// A syntax tree visitor that injects the `ColorMutable` derive macro
@@ -26,32 +26,37 @@ impl VisitMut for DeriveInjector {
 }
 
 fn main() {
-    // Rerun this script if the local schema cache changes
-    println!("cargo:rerun-if-changed=schema.json");
-
-    let schema_url = "https://zed.dev/schema/themes/v0.2.0.json";
     let local_path = Path::new("schema.json");
 
-    // Attempt to download the latest schema, fallback to local cache if offline
-    let schema_content = match reqwest::blocking::get(schema_url) {
-        Ok(resp) => {
-            let text = resp.text().unwrap_or_default();
-            let _ = fs::write(local_path, &text);
-            text
+    // 1. Download schema only if it does not exists in local path
+    if !local_path.exists() {
+        println!("cargo:warning=Downloading Zed schema...");
+        let schema_url = "https://zed.dev/schema/themes/v0.2.0.json";
+        if let Ok(mut resp) = ureq::get(schema_url).call() {
+            if resp.status().is_success() {
+                let text = resp.body_mut().read_to_string().unwrap_or_default();
+                let _ = std::fs::write(local_path, &text);
+            }
         }
-        Err(_) => fs::read_to_string(local_path).expect("Successfully read local schema"),
-    };
+    }
 
+    // 2. Tell Cargo to rebuild script only if schema file or build.rs changes
+    println!("cargo:rerun-if-changed=schema.json");
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:warning=Build.rs is running...");
+
+    let schema_content = fs::read_to_string(local_path)
+        .expect("Failed to read schema.json. Please check your internet connection.");
     let schema = serde_json::from_str::<schemars::schema::RootSchema>(&schema_content).unwrap();
 
     // Generate Rust code from the JSON schema using typify
     let mut type_space = TypeSpace::new(TypeSpaceSettings::default().with_struct_builder(true));
     type_space.add_root_schema(schema).unwrap();
 
-    let generated_code = type_space.to_stream().to_string();
     // Parse the generated code into a Syntax Tree (AST) for modification
     let mut file: syn::File =
-        parse_file(&generated_code).expect("Successfully parsed generated code");
+        parse2(type_space.to_stream()).expect("Successfully parsed generated code");
+
     // Visit the AST and inject our custom derive macro into every struct and enum
     let mut injector = DeriveInjector;
     syn::visit_mut::visit_file_mut(&mut injector, &mut file);

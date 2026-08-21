@@ -12,21 +12,20 @@ serde_json.workspace = true
 anyhow.workspace = true
 rusqlite.workspace = true
 palette.workspace = true
-reqwest = { workspace = true, optional = true, features = ["blocking" ]}
 typify.workspace = true
 dirs = "6.0.0"
 dotenvy = { version = "0.15.7", optional = true }
 rayon = "1.12.0"
 strum = { version = "0.28.0", features = ["derive"] }
 tracing.workspace = true
-tokio = { workspace = true, optional = true }
 tar.workspace = true
 flate2.workspace = true
+ureq = { workspace = true, optional = true }
 
 
 [build-dependencies]
 typify.workspace = true
-reqwest = { workspace = true, features = ["blocking"]}
+ureq.workspace = true
 syn = { workspace = true, features = ["full", "parsing", "visit-mut"]}
 quote.workspace = true
 proc-macro2.workspace = true
@@ -37,4 +36,4 @@ kenaz_macros = { path = "../kenaz_macros"}
 
 
 [features]
-dev-tools = ["dep:reqwest", "dep:dotenvy", "dep:tokio"]
+dev-tools = ["dep:dotenvy", "dep:ureq"]

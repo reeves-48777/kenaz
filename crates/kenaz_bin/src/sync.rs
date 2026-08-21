@@ -29,14 +29,18 @@ pub fn sync_repo(full: bool) -> anyhow::Result<()> {
 fn download_and_extract_pack(url: &str, extract_to: &Path) -> anyhow::Result<()> {
     tracing::info!("Downloading engram pack from {url}...");
 
-    let response =
-        reqwest::blocking::get(url).context("Failed to send HTTP request for engram pack")?;
+    let mut response = ureq::get(url)
+        .call()
+        .context("Failed to send HTTP request")?;
 
     if !response.status().is_success() {
         anyhow::bail!("Failed to download pack: HTTP {}", response.status());
     }
 
-    let bytes = response.bytes().context("Failed to read response bytes")?;
+    let bytes = response
+        .body_mut()
+        .read_to_vec()
+        .context("Failed to read response bytes")?;
 
     tracing::info!("Extracting pack to {extract_to:?}...");
     std::fs::create_dir_all(extract_to)?;

@@ -164,3 +164,52 @@ impl EngramRecordBuilder {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engram::variant::EngramVariant;
+    use crate::engram::vector::OpType;
+
+    #[test]
+    fn test_db_init_and_upsert() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+
+        EngramRecord::init_db(&conn).unwrap();
+
+        let v = EngramVector {
+            op_type: OpType::Direct,
+            weights: [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            delta_l: 0.0,
+            alpha: 1.0,
+        };
+
+        let record = EngramRecord::builder()
+            .with_name("Test theme")
+            .with_variant(EngramVariant::Dark)
+            .with_token_path("editor.background")
+            .with_vector(v)
+            .build()
+            .unwrap();
+
+        assert!(record.upsert(&conn).is_ok());
+
+        let mut stmt = conn
+            .prepare("SELECT theme_name FROM engrams WHERE token_path = ?1")
+            .unwrap();
+        let name: String = stmt
+            .query_row(rusqlite::params!["editor.background"], |row| row.get(0))
+            .unwrap();
+        assert_eq!(name, "test-theme"); // normalized when upserting
+    }
+
+    #[test]
+    fn test_builder_incomplete() {
+        let result =
+            std::panic::catch_unwind(|| EngramRecord::builder().with_name("Incomplete").build());
+        assert!(
+            result.is_err(),
+            "Builder should panic if fields are missing"
+        );
+    }
+}

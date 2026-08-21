@@ -256,3 +256,45 @@ fn extract_colors(
         _ => {}
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_hex_standard() {
+        let color = ExtractedColor::try_parse_hex("#1e1e2e").unwrap();
+        assert_eq!(color.alpha, 1.0);
+        assert!(color.oklab.l > 0.0 && color.oklab.l < 0.5);
+    }
+
+    #[test]
+    fn test_parse_hex_with_alpha() {
+        let color = ExtractedColor::try_parse_hex("#1e1e2eff").unwrap();
+        assert_eq!(color.alpha, 1.0);
+
+        let color_transparent = ExtractedColor::try_parse_hex("#1e1e2e80").unwrap();
+        assert!((color_transparent.alpha - 0.5).abs() < 0.01); // 80 in hex = 128 in decimal = ~50% transparency
+    }
+
+    #[test]
+    fn test_parse_hex_shorthand() {
+        let color_long = ExtractedColor::try_parse_hex("#112233").unwrap();
+        let color_short = ExtractedColor::try_parse_hex("#123").unwrap();
+        assert_eq!(color_long.oklab.l, color_short.oklab.l);
+    }
+
+    #[test]
+    fn test_parse_hex_invalid() {
+        assert!(ExtractedColor::try_parse_hex("#12345").is_err());
+        assert!(ExtractedColor::try_parse_hex("#zzz").is_err());
+    }
+
+    #[test]
+    fn test_oklab_distance() {
+        let c1 = ExtractedColor::try_parse_hex("#000").unwrap();
+        let c2 = ExtractedColor::try_parse_hex("#fff").unwrap();
+        let dist = oklab_distance(c1.oklab, c2.oklab);
+        assert!(dist > 0.9 && dist < 1.1);
+    }
+}

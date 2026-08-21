@@ -11,6 +11,10 @@ use std::path::PathBuf;
 /// This directory is the parent of the downloaded pack
 /// holding the engrams.db SQLite database and styles directory
 pub fn cache_dir() -> PathBuf {
+    if let Ok(test_dir) = std::env::var("KENAZ_TEST_CACHE_DIR") {
+        return PathBuf::from(test_dir);
+    }
+
     let mut path = dirs::cache_dir().expect("Successfully got cache directory");
     path.push("kenaz");
     path
