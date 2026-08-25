@@ -17,7 +17,7 @@ use anyhow::anyhow;
 use palette::{IntoColor, Oklab};
 use rayon::prelude::*;
 
-const FIT_TOKENS_STEPS: usize = 100;
+const FIT_TOKENS_STEPS: usize = 20;
 
 /// Represents a parsed color, holding its `Oklab` value and original alpha channel.
 ///
