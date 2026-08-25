@@ -47,8 +47,9 @@ fn main() -> anyhow::Result<()> {
             engram,
             force,
         } => {
-            let mut app = app::App::new();
-            app.try_build_context(palette, output, engram, force)?;
+            let ctx: app::Context =
+                app::ContextBuilder::new(palette, engram, output, force).build()?;
+            let app = app::App::new(ctx);
             app.build_theme()?;
         }
         Commands::List => {

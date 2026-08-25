@@ -15,39 +15,50 @@ use std::{
 /// Execution context of all user configurations
 pub struct Context {
     pub palette: Palette,
-    pub engram_name: String,
+    pub engram: String,
     pub output: PathBuf,
     pub force_engram_use: bool,
 }
 
+pub struct ContextBuilder {
+    palette_path: PathBuf,
+    engram: String,
+    output: PathBuf,
+    force: bool,
+}
+
+impl ContextBuilder {
+    pub fn new(palette_path: PathBuf, engram: String, output: PathBuf, force: bool) -> Self {
+        Self {
+            palette_path,
+            engram,
+            output,
+            force,
+        }
+    }
+
+    pub fn build(self) -> anyhow::Result<Context> {
+        let toml = std::fs::read_to_string(self.palette_path)?;
+        let palette = toml::from_str(&toml)?;
+
+        Ok(Context {
+            palette,
+            engram: self.engram,
+            output: self.output,
+            force_engram_use: self.force,
+        })
+    }
+}
+
 /// Holds the application state required to forge a new theme.
 pub struct App {
-    ctx: Option<Context>,
+    ctx: Context,
 }
 
 impl App {
     /// Create a new application state with the specified style and output path.
-    pub fn new() -> Self {
-        Self { ctx: None }
-    }
-
-    pub fn try_build_context(
-        &mut self,
-        palette_path: PathBuf,
-        output: PathBuf,
-        engram: String,
-        force: bool,
-    ) -> anyhow::Result<()> {
-        let toml = std::fs::read_to_string(palette_path)?;
-        let palette = toml::from_str(&toml)?;
-
-        self.ctx = Some(Context {
-            palette,
-            engram_name: util::normalize_theme_name(&engram),
-            output,
-            force_engram_use: force,
-        });
-        Ok(())
+    pub fn new(ctx: Context) -> Self {
+        Self { ctx }
     }
 
     /// Builds the theme family by applying the engram to the palette
@@ -58,18 +69,17 @@ impl App {
     /// opposite variant to ensure generation does not fail.
     /// Finally, it writes the generated theme to the output path.
     pub fn build_theme(&self) -> anyhow::Result<()> {
-        let ctx = self.ctx.as_ref().expect("Context has been built");
-
         let conn = rusqlite::Connection::open(engram::db::path())?;
 
-        let themes = ctx
+        let themes = self
+            .ctx
             .palette
             .variants
             .iter()
             .map(|variant| {
                 let engram = match engram::db::get_by_theme_name_and_variant(
                     &conn,
-                    &ctx.engram_name,
+                    &self.ctx.engram,
                     &variant.mode,
                 ) {
                     Ok(e) => e,
@@ -79,11 +89,11 @@ impl App {
 
                         let mut fallback_engram = engram::db::get_by_theme_name_and_variant(
                             &conn,
-                            &ctx.engram_name,
+                            &self.ctx.engram,
                             &fallback_mode,
                         )?;
 
-                        if ctx.force_engram_use {
+                        if self.ctx.force_engram_use {
                             // User asked explicitly to invert engram
                             tracing::info!(
                                 "--force used: applying inversion on {:?} engram to fit {:?} theme",
@@ -99,7 +109,7 @@ impl App {
                             tracing::info!(
                                 "Variant '{:?}' not found for {}, stricly using '{:?}' instead",
                                 requested_mode,
-                                ctx.engram_name,
+                                self.ctx.engram,
                                 fallback_mode
                             );
                         }
@@ -110,12 +120,12 @@ impl App {
 
                 tracing::info!(
                     "Loaded engram for theme '{}' with {} tokens",
-                    &ctx.engram_name,
+                    &self.ctx.engram,
                     engram.len()
                 );
 
                 // Find the original theme JSON file to use as a "canvas" for structure
-                let base_style_value = util::find_base_style(&ctx.engram_name)?;
+                let base_style_value = util::find_base_style(&self.ctx.engram)?;
 
                 // Parse into the strongly-typed Zed schema
                 let mut style: schema::ThemeStyleContent =
@@ -133,16 +143,16 @@ impl App {
             .collect::<anyhow::Result<Vec<_>>>()?;
 
         let family = schema::ThemeFamilyContent {
-            name: ctx.palette.meta.name.clone(),
+            name: self.ctx.palette.meta.name.clone(),
             author: "kenaz".to_string(),
             themes,
         };
 
         // Backup existing file before overwriting
-        self.backup_file(&ctx.output)?;
+        self.backup_file(&self.ctx.output)?;
 
-        std::fs::write(&ctx.output, serde_json::to_string_pretty(&family)?)?;
-        tracing::info!("wrote theme in {:?}", ctx.output);
+        std::fs::write(&self.ctx.output, serde_json::to_string_pretty(&family)?)?;
+        tracing::info!("wrote theme in {:?}", self.ctx.output);
 
         Ok(())
     }
