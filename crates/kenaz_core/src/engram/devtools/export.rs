@@ -1,6 +1,10 @@
 //! Logic for exporting the engram database and styles into distributable archives.
 
-use crate::{engram::db::prelude::EngramRecord, util};
+use crate::{
+    engram::db::prelude::EngramRecord,
+    error::{KenazError, Result},
+    util,
+};
 use std::path::Path;
 
 /// The list of theme to include in the lightweight "Curated Pack".
@@ -19,7 +23,7 @@ const CURATED_REPOS: &[&str] = &[
 /// This creates a lightweight `engrams.db` and a `styles/` folder containing
 /// only the themes defined in `CURATED_REPOS` (unless `full` is true).
 /// It then packs them into a `.tar.gz` archive for GitHub releases.
-pub fn export_pack(source_db_path: &Path, output_archive: &Path, full: bool) -> anyhow::Result<()> {
+pub fn export_pack(source_db_path: &Path, output_archive: &Path, full: bool) -> Result<()> {
     use flate2::{Compression, write::GzEncoder};
     use tar::Builder;
 
@@ -109,7 +113,7 @@ pub fn export_pack(source_db_path: &Path, output_archive: &Path, full: bool) -> 
     if full {
         // FIX: in full mode, we copy database file, optimisation (instant and safe)
         tracing::info!("Copying full database...");
-        source_conn.close().map_err(|(_, e)| anyhow::anyhow!(e))?;
+        source_conn.close().map_err(|(_, e)| KenazError::from(e))?;
         std::fs::copy(source_db_path, &dest_db_path)?;
     } else if !theme_names_to_export.is_empty() {
         // FIX: avoid crash if empty
@@ -146,8 +150,8 @@ pub fn export_pack(source_db_path: &Path, output_archive: &Path, full: bool) -> 
         WHERE LOWER(theme_name) IN ({})", theme_names_sql), [])?;
 
         source_conn.execute("DETACH DATABASE dest", [])?;
-        dest_conn.close().map_err(|(_, e)| anyhow::anyhow!(e))?;
-        source_conn.close().map_err(|(_, e)| anyhow::anyhow!(e))?;
+        dest_conn.close().map_err(|(_, e)| KenazError::from(e))?;
+        source_conn.close().map_err(|(_, e)| KenazError::from(e))?;
     } else {
         tracing::warn!("No themes found to export to curated database");
     }

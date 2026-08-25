@@ -4,6 +4,7 @@
 //! database and temporary files) and provides helpers to locate the raw JSON structure
 //! of a theme to use as a "canvas" for color replacement.
 
+use crate::{KenazError, error::Result};
 use std::path::PathBuf;
 
 /// Returns the root cache directory
@@ -57,7 +58,7 @@ pub fn normalize_theme_name(name: &str) -> String {
 ///
 /// # Errors
 /// Returns an error if the directory cannot be read or if the theme is not found.
-pub fn find_base_style(style_name: &str) -> anyhow::Result<serde_json::Value> {
+pub fn find_base_style(style_name: &str) -> Result<serde_json::Value> {
     let dir = styles_dir();
 
     let normalized_target = normalize_theme_name(style_name);
@@ -100,7 +101,5 @@ pub fn find_base_style(style_name: &str) -> anyhow::Result<serde_json::Value> {
         }
     }
 
-    Err(anyhow::anyhow!(
-        "Base theme style not found for {style_name}"
-    ))
+    Err(KenazError::BaseStyleNotFound(style_name.to_string()))
 }

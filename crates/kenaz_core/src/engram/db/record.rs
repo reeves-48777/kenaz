@@ -1,11 +1,13 @@
-//! Defines the databse schema and the `EngramRecord` struct.
+//! Defines the database schema and the `EngramRecord` struct.
 //!
 //! This module bridges the mathematical `EngramVector` and the SQLite database.
 //! It handles table creation, indexes and the `INSERT OR REPLACE` (upsert) logic
 //! to persist extracted style vectors efficiently.
 
 use crate::{
+    KenazError,
     engram::prelude::{EngramVariant, EngramVector},
+    error::Result,
     util,
 };
 use serde::{Deserialize, Serialize};
@@ -36,7 +38,7 @@ impl EngramRecord {
     ///
     /// This is safe to call multiple times as it uses `IF NOT EXISTS`.
     /// WARNING: Any schema changes must be applied here (and ideally via a migration system in the future).
-    pub fn init_db(conn: &rusqlite::Connection) -> anyhow::Result<()> {
+    pub fn init_db(conn: &rusqlite::Connection) -> Result<()> {
         conn.execute(
             "CREATE TABLE IF NOT EXISTS engrams (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,7 +76,7 @@ impl EngramRecord {
     ///
     /// The theme name is automatically normalized before insertion to ensure
     /// consistent querying.
-    pub fn upsert(&self, conn: &rusqlite::Connection) -> anyhow::Result<()> {
+    pub fn upsert(&self, conn: &rusqlite::Connection) -> Result<()> {
         conn.execute(
             "INSERT OR REPLACE INTO engrams (
                 theme_name, variant, token_path, op_type,
@@ -143,14 +145,22 @@ impl EngramRecordBuilder {
 
     /// Consumes the builder and return the final `EngramRecord`.
     ///
-    /// # Panics
-    /// Panics if any of the expected fields (`theme_name`, `variant`, `token_path`, `vector`)
-    /// have not been provided.
-    pub fn build(self) -> anyhow::Result<EngramRecord> {
-        let theme_name = self.theme_name.expect("Theme name is present");
-        let variant = self.variant.expect("EngramVariant is present");
-        let token_path = self.token_path.expect("Token path is present");
-        let vector = self.vector.expect("EngramVector is present");
+    /// # Errors
+    /// Returns a `KenazError::MissingBuilderField` if any of the required fields
+    /// (`theme_name`, `variant`, `token_path`, `vector`) have not been provided.
+    pub fn build(self) -> Result<EngramRecord> {
+        let theme_name = self
+            .theme_name
+            .ok_or_else(|| KenazError::MissingBuilderField("theme_name".to_string()))?;
+        let variant = self
+            .variant
+            .ok_or_else(|| KenazError::MissingBuilderField("variant".to_string()))?;
+        let token_path = self
+            .token_path
+            .ok_or_else(|| KenazError::MissingBuilderField("token_path".to_string()))?;
+        let vector = self
+            .vector
+            .ok_or_else(|| KenazError::MissingBuilderField("vector".to_string()))?;
 
         Ok(EngramRecord {
             id: None,

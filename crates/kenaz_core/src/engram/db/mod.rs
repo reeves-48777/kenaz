@@ -7,17 +7,17 @@
 mod record;
 mod variant;
 
-use crate::engram::prelude::*;
+use crate::{engram::prelude::*, error::Result};
 
 pub mod prelude {
     pub use super::record::EngramRecord;
 }
 
-/// Queries the database and prints a formatted list of all availabel theme engrams.
+/// Queries the database and prints a formatted list of all available theme engrams.
 ///
 /// This is used by the CLI `--list-engrams` command. It groups the engrams by
 /// theme name and counts the number of tokens extracted per theme.
-pub fn list_engrams(conn: &rusqlite::Connection) -> anyhow::Result<()> {
+pub fn list_engrams(conn: &rusqlite::Connection) -> Result<()> {
     let mut stmt = conn.prepare("SELECT theme_name, COUNT(*) AS tokens FROM engrams GROUP BY theme_name ORDER BY theme_name")?;
     let engrams = stmt.query_map([], |row| {
         let name: String = row.get(0)?;
@@ -56,7 +56,7 @@ pub fn get_by_theme_name_and_variant(
     conn: &rusqlite::Connection,
     theme_name: &str,
     variant: &EngramVariant,
-) -> anyhow::Result<Engram> {
+) -> Result<Engram> {
     let mut stmt = conn.prepare(
         "SELECT token_path, op_type, w_bg, w_fg, w_accent, w_success, w_warning, w_error,
             delta_l, alpha
@@ -94,7 +94,10 @@ pub fn get_by_theme_name_and_variant(
     }
 
     if engram.is_empty() {
-        anyhow::bail!("no engram found for theme='{theme_name}', variant='{variant:?}'");
+        return Err(crate::KenazError::StyleNotFound {
+            theme_name: theme_name.to_string(),
+            variant: *variant,
+        });
     }
 
     Ok(engram)
@@ -104,7 +107,7 @@ pub fn get_by_theme_name_and_variant(
 ///
 /// It attempts to use the OS-specific local data directory. If unavailable,
 /// it falls back to the general data directory, and finally to the current
-/// working director as a last resort.
+/// working directory as a last resort.
 pub fn path() -> std::path::PathBuf {
     use crate::util::cache_dir;
     let mut path = cache_dir();

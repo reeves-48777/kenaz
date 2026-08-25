@@ -601,7 +601,6 @@ dependencies = [
 name = "kenaz_core"
 version = "1.0.4"
 dependencies = [
- "anyhow",
  "dirs",
  "dotenvy",
  "flate2",
@@ -618,6 +617,7 @@ dependencies = [
  "strum",
  "syn 3.0.3",
  "tar",
+ "thiserror",
  "tracing",
  "typify",
  "ureq",

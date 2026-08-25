@@ -26,6 +26,8 @@ pub mod util;
 /// Provides the `ColorMutable` trait and implementation for standard library types.
 pub mod visitor;
 
+pub mod error;
+
 /// The auto-generated Zed theme schema
 ///
 /// This module is populated at compile time by `build.rs` using `typify`.
@@ -36,3 +38,4 @@ pub mod schema {
 
 /// A re-export of the `Engram` type, representing a loaded style mapping( token path to vector).
 pub use engram::Engram;
+pub use error::{KenazError, Result};

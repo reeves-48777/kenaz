@@ -10,10 +10,10 @@
 
 use crate::{
     engram::vector::{EngramVector, OpType},
+    error::{KenazError, Result},
     palette::Colors,
     schema,
 };
-use anyhow::anyhow;
 use palette::{IntoColor, Oklab};
 use rayon::prelude::*;
 
@@ -52,7 +52,7 @@ impl ExtractedColor {
     ///
     /// Supports CSS-style shorthand notations (`#RGB`, `#RGBA`) as well as standard
     /// 6-digit and 8-digit (with alpha) formats.
-    fn try_parse_hex(hex: &str) -> anyhow::Result<Self> {
+    fn parse_hex(hex: &str) -> Result<Self> {
         let hex = hex.trim_start_matches('#');
 
         // Expand shorthand (#RGB -> #RRGGBB)
@@ -62,14 +62,18 @@ impl ExtractedColor {
                 .flat_map(|c| std::iter::repeat(c).take(2))
                 .collect::<String>(),
             6 | 8 => hex.to_string(),
-            _ => return Err(anyhow!("Invalid hex length: {hex}")),
+            _ => return Err(KenazError::InvalidHexColor(hex.to_string())),
         };
 
-        let r = u8::from_str_radix(&expanded[0..2], 16)? as f32 / 255.0;
-        let g = u8::from_str_radix(&expanded[2..4], 16)? as f32 / 255.0;
-        let b = u8::from_str_radix(&expanded[4..6], 16)? as f32 / 255.0;
+        let parse_byte = |s: &str| -> Result<u8> {
+            u8::from_str_radix(s, 16).map_err(|_| KenazError::InvalidHexColor(hex.to_string()))
+        };
+
+        let r = parse_byte(&expanded[0..2])? as f32 / 255.0;
+        let g = parse_byte(&expanded[2..4])? as f32 / 255.0;
+        let b = parse_byte(&expanded[4..6])? as f32 / 255.0;
         let a = if expanded.len() == 8 {
-            u8::from_str_radix(&expanded[6..8], 16)? as f32 / 255.0
+            parse_byte(&expanded[6..8])? as f32 / 255.0
         } else {
             1.0
         };
@@ -135,16 +139,16 @@ pub fn fit_token(target: ExtractedColor, anchors: &Colors) -> EngramVector {
 ///
 /// These anchors define the palette of the source theme, which `fit_token`
 /// will use as a reference to calculate all other token vectors.
-pub fn extract_anchors(theme: &schema::ThemeContent) -> anyhow::Result<Colors> {
+pub fn extract_anchors(theme: &schema::ThemeContent) -> Result<Colors> {
     let style = serde_json::to_value(&theme.style)?;
 
-    let get = |path: &str| -> anyhow::Result<Oklab> {
-        let raw_hex = style.get(path).and_then(|v| v.as_str()).ok_or_else(|| {
-            anyhow::anyhow!("missing anchor token '{path}' in theme {}", theme.name)
-        })?;
+    let get = |path: &str| -> Result<Oklab> {
+        let raw_hex = style
+            .get(path)
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| KenazError::MissingAnchor(path.to_string()))?;
 
-        let extracted = ExtractedColor::try_parse_hex(raw_hex)
-            .map_err(|_| anyhow::anyhow!("invalid hex color for '{path}': {raw_hex}"))?;
+        let extracted = ExtractedColor::parse_hex(raw_hex)?;
         Ok(extracted.oklab)
     };
 
@@ -249,7 +253,7 @@ fn extract_colors(
             }
         }
         serde_json::Value::String(s) => {
-            if let Ok(extracted) = ExtractedColor::try_parse_hex(s) {
+            if let Ok(extracted) = ExtractedColor::parse_hex(s) {
                 out.push((prefix, extracted));
             }
         }
@@ -263,37 +267,37 @@ mod tests {
 
     #[test]
     fn test_parse_hex_standard() {
-        let color = ExtractedColor::try_parse_hex("#1e1e2e").unwrap();
+        let color = ExtractedColor::parse_hex("#1e1e2e").unwrap();
         assert_eq!(color.alpha, 1.0);
         assert!(color.oklab.l > 0.0 && color.oklab.l < 0.5);
     }
 
     #[test]
     fn test_parse_hex_with_alpha() {
-        let color = ExtractedColor::try_parse_hex("#1e1e2eff").unwrap();
+        let color = ExtractedColor::parse_hex("#1e1e2eff").unwrap();
         assert_eq!(color.alpha, 1.0);
 
-        let color_transparent = ExtractedColor::try_parse_hex("#1e1e2e80").unwrap();
+        let color_transparent = ExtractedColor::parse_hex("#1e1e2e80").unwrap();
         assert!((color_transparent.alpha - 0.5).abs() < 0.01); // 80 in hex = 128 in decimal = ~50% transparency
     }
 
     #[test]
     fn test_parse_hex_shorthand() {
-        let color_long = ExtractedColor::try_parse_hex("#112233").unwrap();
-        let color_short = ExtractedColor::try_parse_hex("#123").unwrap();
+        let color_long = ExtractedColor::parse_hex("#112233").unwrap();
+        let color_short = ExtractedColor::parse_hex("#123").unwrap();
         assert_eq!(color_long.oklab.l, color_short.oklab.l);
     }
 
     #[test]
     fn test_parse_hex_invalid() {
-        assert!(ExtractedColor::try_parse_hex("#12345").is_err());
-        assert!(ExtractedColor::try_parse_hex("#zzz").is_err());
+        assert!(ExtractedColor::parse_hex("#12345").is_err());
+        assert!(ExtractedColor::parse_hex("#zzz").is_err());
     }
 
     #[test]
     fn test_oklab_distance() {
-        let c1 = ExtractedColor::try_parse_hex("#000").unwrap();
-        let c2 = ExtractedColor::try_parse_hex("#fff").unwrap();
+        let c1 = ExtractedColor::parse_hex("#000").unwrap();
+        let c2 = ExtractedColor::parse_hex("#fff").unwrap();
         let dist = oklab_distance(c1.oklab, c2.oklab);
         assert!(dist > 0.9 && dist < 1.1);
     }

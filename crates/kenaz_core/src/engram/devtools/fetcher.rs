@@ -15,20 +15,20 @@ use ureq::{
     middleware::MiddlewareNext,
 };
 
+use crate::{KenazError, error::Result};
+
 /// Cleans and validate a GitHub repository URL to extract "owner/repo" format.
-pub fn clean_github_url(repo_url: &str) -> anyhow::Result<String> {
+pub fn clean_github_url(repo_url: &str) -> Result<String> {
     let target = repo_url
         .trim_end_matches('/')
         .strip_prefix(GITHUB_ROOT_URL)
-        .ok_or_else(|| anyhow::anyhow!("Unexpected repository URL format: {repo_url}"))?;
+        .ok_or_else(|| KenazError::InvalidRepoURLFormat(repo_url.to_string()))?;
 
     let target = target.trim_end_matches(".git");
     let target = target.split('/').take(2).collect::<Vec<_>>().join("/");
 
     if target.split('/').count() != 2 {
-        return Err(anyhow::anyhow!(
-            "Invalid repo format after cleaning: {target}"
-        ));
+        return Err(KenazError::InvalidRepoURLFormat(target));
     }
 
     Ok(target)
@@ -38,9 +38,9 @@ pub fn clean_github_url(repo_url: &str) -> anyhow::Result<String> {
 ///
 /// Requires `Send + Sync` to be safely shared across multiple threads via `Arc`.
 pub trait ThemeFetcher: Send + Sync {
-    fn fetch_repos(&self) -> anyhow::Result<ExtensionResponse>;
-    fn fetch_tree(&self, repo_url: &str) -> anyhow::Result<(Vec<String>, String)>;
-    fn fetch_raw_file(&self, url: &str) -> anyhow::Result<String>;
+    fn fetch_repos(&self) -> Result<ExtensionResponse>;
+    fn fetch_tree(&self, repo_url: &str) -> Result<(Vec<String>, String)>;
+    fn fetch_raw_file(&self, url: &str) -> Result<String>;
 }
 
 /// The real fetcher that hits GitHub and Zed's API using `ureq`.
@@ -54,7 +54,7 @@ impl GithubFetcher {
     const GITHUB_API_ROOT_URL: &'static str = "https://api.github.com/repos";
 
     /// Initializes the HTTP client with the correct headers and user agent.
-    pub fn try_new() -> anyhow::Result<Self> {
+    pub fn try_new() -> Result<Self> {
         let client = ureq::Agent::config_builder()
             .user_agent("kenaz")
             .timeout_global(Some(Duration::from_secs(15)))
@@ -68,7 +68,7 @@ impl GithubFetcher {
     fn middleware(
         mut req: Request<SendBody>,
         next: MiddlewareNext,
-    ) -> Result<Response<Body>, ureq::Error> {
+    ) -> std::result::Result<Response<Body>, ureq::Error> {
         if let Ok(token) = std::env::var("GITHUB_TOKEN") {
             let auth = format!("Bearer {token}");
             req.headers_mut().insert(
@@ -83,7 +83,7 @@ impl GithubFetcher {
 }
 
 impl ThemeFetcher for GithubFetcher {
-    fn fetch_repos(&self) -> anyhow::Result<ExtensionResponse> {
+    fn fetch_repos(&self) -> Result<ExtensionResponse> {
         Ok(self
             .agent
             .get(Self::ZED_EXTENSION_API_URL)
@@ -92,7 +92,7 @@ impl ThemeFetcher for GithubFetcher {
             .read_json()?)
     }
 
-    fn fetch_tree(&self, repo_url: &str) -> anyhow::Result<(Vec<String>, String)> {
+    fn fetch_tree(&self, repo_url: &str) -> Result<(Vec<String>, String)> {
         let target = clean_github_url(repo_url)?;
 
         let root_url = Self::GITHUB_API_ROOT_URL;
@@ -122,7 +122,7 @@ impl ThemeFetcher for GithubFetcher {
         Ok((theme_files, branch))
     }
 
-    fn fetch_raw_file(&self, url: &str) -> anyhow::Result<String> {
+    fn fetch_raw_file(&self, url: &str) -> Result<String> {
         Ok(self.agent.get(url).call()?.body_mut().read_to_string()?)
     }
 }

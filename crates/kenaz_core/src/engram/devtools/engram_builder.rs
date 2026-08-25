@@ -2,12 +2,14 @@
 
 use super::consts::*;
 use crate::{
+    KenazError,
     engram::{
         db::{self, prelude::*},
         devtools::fetcher::{GithubFetcher, ThemeFetcher},
         fit,
         variant::EngramVariant,
     },
+    error::Result,
     schema, util,
 };
 use ::std::sync::{Arc, mpsc};
@@ -68,7 +70,7 @@ impl EngramBuilder {
     /// This is the main orchestrator. It optionally fetches themes, then iterates
     /// through all downloaded JSON files, extracts the anchors, calculates the
     /// engram vectors, and saves them in a single database transaction for performance.
-    pub fn build_engrams(&mut self) -> anyhow::Result<()> {
+    pub fn build_engrams(&mut self) -> Result<()> {
         if !self.skip_fetch {
             self.fetch_themes()?;
         }
@@ -168,8 +170,7 @@ impl EngramBuilder {
         }
 
         tx.commit()?;
-        conn.close()
-            .map_err(|(_, e)| anyhow::anyhow!("Connection error: {e}"))?;
+        conn.close().map_err(|(_, e)| KenazError::from(e))?;
 
         tracing::info!("Engram build ended ! {total_themes} themes built and saved in database");
         Ok(())
@@ -180,7 +181,7 @@ impl EngramBuilder {
     /// Queries the Zed API for a list of theme extensions, then concurrently
     /// downloads the raw JSON file from their respective GitHub repositories.
     /// Uses a semaphore to limit concurrent requests and avoid rate limiting.
-    fn fetch_themes(&mut self) -> anyhow::Result<()> {
+    fn fetch_themes(&mut self) -> Result<()> {
         use super::guard::PermitGuard;
 
         // fetching official zed themes
@@ -205,7 +206,7 @@ impl EngramBuilder {
 
             let fetcher = Arc::clone(&self.fetcher);
 
-            let handle = std::thread::spawn(move || -> anyhow::Result<()> {
+            let handle = std::thread::spawn(move || -> Result<()> {
                 let _permit = rx.lock().unwrap().recv().unwrap();
                 let _guard = PermitGuard {
                     tx: std::sync::Arc::clone(&tx),
@@ -247,7 +248,7 @@ impl EngramBuilder {
     }
 
     /// Fetches official base themes from the Zed repository
-    fn fetch_official_themes(&mut self) -> anyhow::Result<()> {
+    fn fetch_official_themes(&mut self) -> Result<()> {
         tracing::info!("Fetching official Zed themes...");
         let tree_url = "https://github.com/zed-industries/zed";
 
@@ -284,7 +285,7 @@ mod tests {
     struct MockFetcher;
 
     impl ThemeFetcher for MockFetcher {
-        fn fetch_repos(&self) -> anyhow::Result<ExtensionResponse> {
+        fn fetch_repos(&self) -> Result<ExtensionResponse> {
             let data = (0..15)
                 .map(|i| ExtensionEntry {
                     name: format!("Mock theme {i}"),
@@ -294,14 +295,14 @@ mod tests {
             Ok(ExtensionResponse { data })
         }
 
-        fn fetch_tree(&self, _repo_url: &str) -> anyhow::Result<(Vec<String>, String)> {
+        fn fetch_tree(&self, _repo_url: &str) -> Result<(Vec<String>, String)> {
             Ok((
                 vec!["themes/mock-theme.json".to_string()],
                 "main".to_string(),
             ))
         }
 
-        fn fetch_raw_file(&self, _url: &str) -> anyhow::Result<String> {
+        fn fetch_raw_file(&self, _url: &str) -> Result<String> {
             Ok(r##"{
                 "themes": [{
                     "name": "Mock Theme",
