@@ -54,14 +54,14 @@ impl GithubFetcher {
     const GITHUB_API_ROOT_URL: &'static str = "https://api.github.com/repos";
 
     /// Initializes the HTTP client with the correct headers and user agent.
-    pub fn try_new() -> Result<Self> {
+    pub fn new() -> Self {
         let client = ureq::Agent::config_builder()
             .user_agent("kenaz")
             .timeout_global(Some(Duration::from_secs(15)))
             .middleware(Self::middleware)
             .build()
             .into();
-        Ok(Self { agent: client })
+        Self { agent: client }
     }
 
     /// Middleware that adds needed headers to each reqwest

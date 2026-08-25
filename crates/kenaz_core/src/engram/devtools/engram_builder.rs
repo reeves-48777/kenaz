@@ -42,8 +42,7 @@ impl EngramBuilder {
     }
 
     pub fn new() -> Self {
-        let fetcher =
-            Arc::new(GithubFetcher::try_new().expect("Successfully initialized HTTP client"));
+        let fetcher = Arc::new(GithubFetcher::new());
         Self {
             fetcher,
             skip_fetch: false,
