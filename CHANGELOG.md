@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-08-26
+### Performance
+- Zero-Allocation Extraction: Updated extract_colors to use the PathBuffer trait (with_dynamic_segment, with_index). This unifies the path-building logic with the application phase and eliminates all remaining format! allocations during the engram extraction process.
+
 ## [1.0.5] - 2026-08-26
 ### Added
 - Typed Errors: Introduced KenazError using thiserror for robust, typed error handling across kenaz_core.
