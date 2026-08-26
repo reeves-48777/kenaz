@@ -17,7 +17,6 @@ mod consts;
 mod engram_builder;
 mod export;
 mod fetcher;
-mod guard;
 
 pub mod prelude {
     pub use super::engram_builder::EngramBuilder;
