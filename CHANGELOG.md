@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.5] - 2026-08-26
+### Added
+- Typed Errors: Introduced KenazError using thiserror for robust, typed error handling across kenaz_core.
+- Zero-Allocation Traversal: Implemented a PathBuffer trait with closures (with_segment, with_index) to eliminate String allocations during recursive schema traversal.
+- Database Utilities: Added ConnectionExt trait for safe SQLite closure and EngramRecord::delete_by_theme_name for future edit commands.
+- Benchmarks: Added criterion benchmarks for fit_token and apply_colors to measure engine performance.
+
+### Changed
+- Concurrency: Replaced the manual mpsc semaphore and PermitGuard with a standard rayon::ThreadPool for fetching themes.
+- Database API: Replaced EngramRecordBuilder with a simpler, infallible EngramRecord::new() constructor.
+- Math Performance: Reduced FIT_TOKENS_STEPS from 100 to 20 for faster engram extraction with imperceptible visual difference.
+- JSON Parsing: Switched to serde_json::from_slice for slightly faster, zero-copy reading of base theme files.
+
+### Removed
+- Removed anyhow from kenaz_core in favor of the custom KenazError enum.
+- Removed tokio and reqwest completely from the workspace, resulting in significantly faster compile times.
+
 ## [1.0.4] - 2026-08-20
 ### Fixed
 - Curated Export Bug: Fixed an issue where a missing ! in the is_file() check caused the export process to silently skip all JSON files, resulting in an empty curated database.
