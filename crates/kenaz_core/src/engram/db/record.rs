@@ -28,6 +28,9 @@ pub struct EngramRecord {
 }
 
 impl EngramRecord {
+    /// Creates a new in-memory `EngramRecord` ready to be persisted via [`upsert`](Self::upsert).
+    ///
+    /// `id` is always `None` here - it is assigned by SQLite's `AUTOINCREMENT` on insert.
     pub fn new(
         theme_name: &str,
         variant: EngramVariant,
@@ -112,8 +115,16 @@ impl EngramRecord {
         Ok(())
     }
 
-    /// Deletes all engrams for a specific theme
-    /// Returns the number of rows deleted
+    /// Deletes all engrams associated with a specific theme.
+    ///
+    /// The theme name is normalized the same way as during insertion, so this
+    /// works regardless of the original casing/spacing used.
+    ///
+    /// # Errors
+    /// Returns an error if the underlying `DELETE` query fails.
+    ///
+    /// # Returns
+    /// The number of rows deleted
     pub fn delete_by_theme_name(conn: &rusqlite::Connection, theme_name: &str) -> Result<usize> {
         let normalized_name = util::normalize_theme_name(theme_name);
         let rows_deleted = conn.execute(

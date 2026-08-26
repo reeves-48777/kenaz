@@ -13,13 +13,31 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Write;
 
+/// Provides zero-allocation path building for the recursive `ColorMutable` traversal.
+///
+/// Instead of allocation a new `String` at each level of recursion (via `format!`),
+/// implementors mutate a single shared buffer, appending a segment before the
+/// recursive call and truncating it back afterward. This keeps memory allocations
+/// constant regardless of the tree's depth.
 pub trait PathBuffer {
+    /// Appends a static field name to the path (e.g. a struct field), separated
+    /// by `_`from the existing content, then truncates it back after `f` returns.
     fn with_segment<R>(&mut self, segment: &str, f: impl FnOnce(&mut Self) -> R) -> R;
+
+    /// Like [`with_segment`](Self::with_segment), but for a segment that must be
+    /// build dynamically (e.g. a sanitized `HashMap` key) rather than passed as
+    /// a ready-made `&str`.
     fn with_dynamic_segment<R>(
         &mut self,
         write: impl FnOnce(&mut Self),
         f: impl FnOnce(&mut Self) -> R,
     ) -> R;
+
+    /// Appends a numeric index in `[i]` notation (e.g. for `Vec` elements),
+    /// then truncates it back after `f` returns.
+    ///
+    /// This format must stay in sync with [`extract_colors`](crate::engram::fit::extract_colors),
+    /// which produces the same `[i]` notation when flattening JSON arrays.
     fn with_index<R>(&mut self, index: usize, f: impl FnOnce(&mut Self) -> R) -> R;
 }
 

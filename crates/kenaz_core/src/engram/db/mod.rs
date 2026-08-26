@@ -14,7 +14,10 @@ pub mod prelude {
     pub use super::record::EngramRecord;
 }
 
+/// Extension trait for [`rusqlite::Connection`] to simplify error handling.
 pub trait ConnectionExt {
+    /// Closes the connection, converting rusqlite's `(Connection, Error)` tuple
+    /// error into a plain [`KenazError`] for use with the `?` operator.
     fn close_safely(self) -> Result<()>;
 }
 

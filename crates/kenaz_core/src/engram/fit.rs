@@ -13,6 +13,7 @@ use crate::{
     error::{KenazError, Result},
     palette::Colors,
     schema,
+    visitor::PathBuffer,
 };
 use palette::{IntoColor, Oklab};
 use rayon::prelude::*;
@@ -175,7 +176,8 @@ pub fn fit_theme(
         .flat_map(|t| {
             let style_value = serde_json::to_value(&t.style).unwrap_or(serde_json::Value::Null);
             let mut colors = Vec::new();
-            extract_colors(&style_value, String::new(), &mut colors);
+            let mut path_buffer = String::with_capacity(64);
+            extract_colors(&style_value, &mut path_buffer, &mut colors);
             colors
         })
         .collect::<Vec<_>>()
@@ -231,30 +233,30 @@ fn mix_oklab(a: Oklab, b: Oklab, t: f32) -> Oklab {
 /// with the Rust schema.
 fn extract_colors(
     value: &serde_json::Value,
-    prefix: String,
+    current_path: &mut String,
     out: &mut Vec<(String, ExtractedColor)>,
 ) {
     match value {
         serde_json::Value::Object(map) => {
             for (k, v) in map {
-                let clean_k = k.replace('.', "_");
-                let path = if prefix.is_empty() {
-                    clean_k
-                } else {
-                    format!("{prefix}_{clean_k}")
-                };
-
-                extract_colors(v, path, out);
+                current_path.with_dynamic_segment(
+                    |buf| {
+                        for c in k.chars() {
+                            buf.push(if c == '.' { '_' } else { c });
+                        }
+                    },
+                    |path| extract_colors(v, path, out),
+                );
             }
         }
         serde_json::Value::Array(arr) => {
             for (i, v) in arr.iter().enumerate() {
-                extract_colors(v, format!("{prefix}[{i}]"), out);
+                current_path.with_index(i, |path| extract_colors(v, path, out));
             }
         }
         serde_json::Value::String(s) => {
             if let Ok(extracted) = ExtractedColor::parse_hex(s) {
-                out.push((prefix, extracted));
+                out.push((current_path.clone(), extracted));
             }
         }
         _ => {}
@@ -313,7 +315,8 @@ mod tests {
         });
 
         let mut extracted = Vec::new();
-        extract_colors(&json, String::new(), &mut extracted);
+        let mut path_buffer = String::with_capacity(64);
+        extract_colors(&json, &mut path_buffer, &mut extracted);
         assert_eq!(
             extracted.len(),
             3,
