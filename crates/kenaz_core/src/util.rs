@@ -58,7 +58,7 @@ pub fn normalize_theme_name(name: &str) -> String {
 ///
 /// # Errors
 /// Returns an error if the directory cannot be read or if the theme is not found.
-pub fn find_base_style(style_name: &str) -> Result<serde_json::Value> {
+pub fn find_base_style(style_name: &str) -> Result<std::path::PathBuf> {
     let dir = styles_dir();
 
     let normalized_target = normalize_theme_name(style_name);
@@ -75,26 +75,21 @@ pub fn find_base_style(style_name: &str) -> Result<serde_json::Value> {
         for file_entry in std::fs::read_dir(&repo_dir)? {
             let file_path = file_entry?.path();
 
-            if !file_path.is_file() || file_path.extension().map_or(true, |ext| ext != "json") {
+            if !file_path.is_file() || file_path.extension().is_none_or(|ext| ext != "json") {
                 continue;
             }
 
             // 3. Parse the JSON file and look for the requested theme
-            if let Ok(content) = std::fs::read_to_string(&file_path) {
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if let Some(themes) = json.get("themes").and_then(|t| t.as_array()) {
-                        for theme in themes {
-                            if let Some(name) = theme.get("name").and_then(|n| n.as_str()) {
-                                if normalize_theme_name(name) == normalized_target {
-                                    if let Some(style) = theme.get("style") {
-                                        tracing::debug!(
-                                            "Found base style for {style_name} in {file_path:?}"
-                                        );
-                                        return Ok(style.clone());
-                                    }
-                                }
-                            }
-                        }
+            if let Ok(content) = std::fs::read_to_string(&file_path)
+                && let Ok(json) = serde_json::from_str::<serde_json::Value>(&content)
+                && let Some(themes) = json.get("themes").and_then(|t| t.as_array())
+            {
+                for theme in themes {
+                    if let Some(name) = theme.get("name").and_then(|n| n.as_str())
+                        && normalize_theme_name(name) == normalized_target
+                    {
+                        tracing::debug!("Found base style for {style_name} in {file_path:?}");
+                        return Ok(file_path);
                     }
                 }
             }

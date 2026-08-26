@@ -99,13 +99,16 @@ impl ForgeContext {
                 );
 
                 // Find the original theme JSON file to use as a "canvas" for structure
-                let base_style_value = util::find_base_style(&self.engram_name)?;
+                let base_style_path = util::find_base_style(&self.engram_name)?;
+
+                let file_bytes = std::fs::read(&base_style_path)?;
 
                 // Parse into the strongly-typed Zed schema
-                let mut style: ThemeStyleContent = serde_json::from_value(base_style_value)?;
+                let mut style: ThemeStyleContent = serde_json::from_slice(&file_bytes)?;
 
                 // Apply the style transfer math
-                style.apply_colors("", &engram, &variant.colors);
+                let mut path_buffer = String::with_capacity(64);
+                style.apply_colors(&mut path_buffer, &engram, &variant.colors);
 
                 Ok(ThemeContent {
                     name: variant.name.clone(),

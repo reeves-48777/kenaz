@@ -28,10 +28,9 @@ pub fn derive_color_mutable(input: TokenStream) -> TokenStream {
 
                     quote! {
                         {
-                            // We use '_' to join paths to match the keys stored in the SQLite database
-                            // (e.g., "editor_background" instead of "editor.background".)
-                            let new_path = if current_path.is_empty() { #field_name_str.to_string() } else { format!("{}_{}", current_path, #field_name_str) };
-                            self.#field_name.apply_colors(&new_path, engram, anchors);
+                            current_path.with_segment(#field_name_str, |path| {
+                                self.#field_name.apply_colors(path, engram, anchors);
+                            });
                         }
                     }
                 });
@@ -42,9 +41,9 @@ pub fn derive_color_mutable(input: TokenStream) -> TokenStream {
                     let index = syn::Index::from(i);
                     quote! {
                         {
-                            // Tuples and array-like structs use indexed notation
-                            let new_path = format!("{}[{}]", current_path, #i);
-                            self.#index.apply_colors(&new_path, engram, anchors);
+                            current_path.with_index(#i, |path| {
+                                self.#index.apply_colors(path, engram, anchors);
+                            });
                         }
                     }
                 });
@@ -55,24 +54,23 @@ pub fn derive_color_mutable(input: TokenStream) -> TokenStream {
         Data::Enum(data) => {
             let arms = data.variants.iter().map(|v| {
                 let ident = &v.ident;
+                let ident_str = ident.to_string();
                 match &v.fields {
                     Fields::Named(fields) => {
-                        let field_names = fields.named.iter().map(|f| f.ident.as_ref().unwrap());
-                        let field_names2 = field_names.clone();
+                        let field_idents = fields.named.iter().map(|f| f.ident.as_ref().unwrap());
+                        let field_idents2 = field_idents.clone();
                         let field_strs = fields
                             .named
                             .iter()
                             .map(|f| f.ident.as_ref().unwrap().to_string());
                         quote! {
-                            #name::#ident { #(#field_names),* } => {
+                            #name::#ident { #(#field_idents),* } => {
                                 #(
-                                    // Ensure enum variant fields also use the '_' separator
-                                    let new_path = if current_path.is_empty() {
-                                        #field_strs.to_string()
-                                    } else {
-                                        format!("{}_{}", current_path, #field_strs)
-                                    };
-                                    #field_names2.apply_colors(&new_path, engram, anchors);
+                                    current_path.with_segment(#ident_str, |path| {
+                                        path.with_segment(#field_strs, |inner| {
+                                            #field_idents2.apply_colors(inner, engram, anchors);
+                                        });
+                                    });
                                 )*
                             }
                         }
@@ -86,12 +84,15 @@ pub fn derive_color_mutable(input: TokenStream) -> TokenStream {
                             )
                         });
                         let bindings2 = bindings.clone();
-                        let strs = (0..fields.unnamed.len()).map(|i| i.to_string());
+                        let indices = 0..fields.unnamed.len();
                         quote! {
                             #name::#ident( #(#bindings),* ) => {
                                 #(
-                                    let new_path = format!("{}[{}]", current_path, #strs);
-                                    #bindings2.apply_colors(&new_path, engram, anchors);
+                                    current_path.with_segment(#ident_str, |path| {
+                                        path.with_index(#indices, |inner| {
+                                            #bindings2.apply_colors(inner, engram, anchors);
+                                        });
+                                    });
                                 )*
                             }
                         }
@@ -111,7 +112,8 @@ pub fn derive_color_mutable(input: TokenStream) -> TokenStream {
     // Inject the generated body into the trait implementation
     let expanded = quote! {
         impl crate::visitor::ColorMutable for #name {
-            fn apply_colors(&mut self, current_path: &str, engram: &crate::engram::Engram, anchors: &crate::palette::Colors) {
+            fn apply_colors(&mut self, current_path: &mut String, engram: &crate::engram::Engram, anchors: &crate::palette::Colors) {
+                use crate::visitor::PathBuffer;
                 #body
             }
         }

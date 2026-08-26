@@ -32,6 +32,7 @@ pub mod error;
 ///
 /// This module is populated at compile time by `build.rs` using `typify`.
 /// It contains strongly-typed structs and enums representing the `theme.json` specification.
+#[allow(clippy::all, clippy::pedantic, dead_code)]
 pub mod schema {
     include!(concat!(env!("OUT_DIR"), "/schema.rs"));
 }

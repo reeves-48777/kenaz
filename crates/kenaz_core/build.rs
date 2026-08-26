@@ -32,18 +32,18 @@ fn main() {
     if !local_path.exists() {
         println!("cargo:warning=Downloading Zed schema...");
         let schema_url = "https://zed.dev/schema/themes/v0.2.0.json";
-        if let Ok(mut resp) = ureq::get(schema_url).call() {
-            if resp.status().is_success() {
-                let text = resp.body_mut().read_to_string().unwrap_or_default();
-                let _ = std::fs::write(local_path, &text);
-            }
+        if let Ok(mut resp) = ureq::get(schema_url).call()
+            && resp.status().is_success()
+        {
+            let text = resp.body_mut().read_to_string().unwrap_or_default();
+            let _ = std::fs::write(local_path, &text);
         }
     }
 
     // 2. Tell Cargo to rebuild script only if schema file or build.rs changes
     println!("cargo:rerun-if-changed=schema.json");
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:warning=Build.rs is running...");
+    println!("cargo:info=Build.rs is running...");
 
     let schema_content = fs::read_to_string(local_path)
         .expect("Failed to read schema.json. Please check your internet connection.");
