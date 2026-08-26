@@ -5,7 +5,6 @@
 //! to persist extracted style vectors efficiently.
 
 use crate::{
-    KenazError,
     engram::prelude::{EngramVariant, EngramVector},
     error::Result,
     util,
@@ -29,16 +28,28 @@ pub struct EngramRecord {
 }
 
 impl EngramRecord {
-    /// Creates a new `EngramRecordBuilder` to compose the record step-by-step.
-    pub fn builder() -> EngramRecordBuilder {
-        EngramRecordBuilder::new()
+    pub fn new(
+        theme_name: &str,
+        variant: EngramVariant,
+        token_path: &str,
+        vector: EngramVector,
+    ) -> Self {
+        Self {
+            id: None,
+            theme_name: theme_name.to_string(),
+            variant,
+            token_path: token_path.to_string(),
+            op_type: vector.op_type as u8,
+            weights: vector.weights,
+            delta_l: vector.delta_l,
+            alpha: vector.alpha,
+        }
     }
-
     /// Initializes the database schema by creating the `engrams` table and its indexes.
     ///
     /// This is safe to call multiple times as it uses `IF NOT EXISTS`.
     /// WARNING: Any schema changes must be applied here (and ideally via a migration system in the future).
-    pub fn init_db(conn: &rusqlite::Connection) -> Result<()> {
+    pub fn create_table_if_not_exists(conn: &rusqlite::Connection) -> Result<()> {
         conn.execute(
             "CREATE TABLE IF NOT EXISTS engrams (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,78 +111,16 @@ impl EngramRecord {
         )?;
         Ok(())
     }
-}
 
-/// A builder struct to construct an `EngramRecord` step-by-step
-///
-/// All fields are `Option` to facilitate composing the record from different
-/// data sources (metadata like theme name vs. mathematical data like the vector).
-pub struct EngramRecordBuilder {
-    theme_name: Option<String>,
-    variant: Option<EngramVariant>,
-    token_path: Option<String>,
-    vector: Option<EngramVector>,
-}
-
-impl EngramRecordBuilder {
-    pub fn new() -> Self {
-        Self {
-            theme_name: None,
-            variant: None,
-            token_path: None,
-            vector: None,
-        }
-    }
-
-    pub fn with_name(mut self, name: &str) -> Self {
-        self.theme_name = Some(name.to_owned());
-        self
-    }
-
-    pub fn with_variant(mut self, variant: EngramVariant) -> Self {
-        self.variant = Some(variant);
-        self
-    }
-
-    pub fn with_token_path(mut self, token_path: &str) -> Self {
-        self.token_path = Some(token_path.to_owned());
-        self
-    }
-
-    pub fn with_vector(mut self, vector: EngramVector) -> Self {
-        self.vector = Some(vector);
-        self
-    }
-
-    /// Consumes the builder and return the final `EngramRecord`.
-    ///
-    /// # Errors
-    /// Returns a `KenazError::MissingBuilderField` if any of the required fields
-    /// (`theme_name`, `variant`, `token_path`, `vector`) have not been provided.
-    pub fn build(self) -> Result<EngramRecord> {
-        let theme_name = self
-            .theme_name
-            .ok_or_else(|| KenazError::MissingBuilderField("theme_name".to_string()))?;
-        let variant = self
-            .variant
-            .ok_or_else(|| KenazError::MissingBuilderField("variant".to_string()))?;
-        let token_path = self
-            .token_path
-            .ok_or_else(|| KenazError::MissingBuilderField("token_path".to_string()))?;
-        let vector = self
-            .vector
-            .ok_or_else(|| KenazError::MissingBuilderField("vector".to_string()))?;
-
-        Ok(EngramRecord {
-            id: None,
-            theme_name,
-            variant,
-            token_path,
-            op_type: vector.op_type as u8,
-            weights: vector.weights,
-            delta_l: vector.delta_l,
-            alpha: vector.alpha,
-        })
+    /// Deletes all engrams for a specific theme
+    /// Returns the number of rows deleted
+    pub fn delete_by_theme_name(conn: &rusqlite::Connection, theme_name: &str) -> Result<usize> {
+        let normalized_name = util::normalize_theme_name(theme_name);
+        let rows_deleted = conn.execute(
+            "DELETE FROM engrams WHERE theme_name = ?1",
+            rusqlite::params![normalized_name],
+        )?;
+        Ok(rows_deleted)
     }
 }
 
@@ -185,7 +134,7 @@ mod tests {
     fn test_db_init_and_upsert() {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
 
-        EngramRecord::init_db(&conn).unwrap();
+        EngramRecord::create_table_if_not_exists(&conn).unwrap();
 
         let v = EngramVector {
             op_type: OpType::Direct,
@@ -194,13 +143,7 @@ mod tests {
             alpha: 1.0,
         };
 
-        let record = EngramRecord::builder()
-            .with_name("Test theme")
-            .with_variant(EngramVariant::Dark)
-            .with_token_path("editor.background")
-            .with_vector(v)
-            .build()
-            .unwrap();
+        let record = EngramRecord::new("Test theme", EngramVariant::Dark, "editor.background", v);
 
         assert!(record.upsert(&conn).is_ok());
 
@@ -211,15 +154,5 @@ mod tests {
             .query_row(rusqlite::params!["editor.background"], |row| row.get(0))
             .unwrap();
         assert_eq!(name, "test-theme"); // normalized when upserting
-    }
-
-    #[test]
-    fn test_builder_incomplete() {
-        let result =
-            std::panic::catch_unwind(|| EngramRecord::builder().with_name("Incomplete").build());
-        assert!(
-            result.is_err(),
-            "Builder should panic if fields are missing"
-        );
     }
 }

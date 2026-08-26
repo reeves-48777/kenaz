@@ -1,8 +1,9 @@
 //! The main orchestrator for scraping and building the engram database.
 
+use rayon::iter::IntoParallelRefIterator;
+
 use super::consts::*;
 use crate::{
-    KenazError,
     engram::{
         db::{self, prelude::*},
         devtools::fetcher::{GithubFetcher, ThemeFetcher},
@@ -12,7 +13,7 @@ use crate::{
     error::Result,
     schema, util,
 };
-use ::std::sync::{Arc, mpsc};
+use ::std::sync::Arc;
 
 // TODO: Consider renaming to `EngramFactory` to better reflect its role.
 /// Builds the engram database by fetching and processing Zed themes.
@@ -80,7 +81,7 @@ impl EngramBuilder {
             std::fs::create_dir_all(parent_dir)?;
         }
         let conn = rusqlite::Connection::open(db_path)?;
-        EngramRecord::init_db(&conn)?;
+        EngramRecord::create_table_if_not_exists(&conn)?;
 
         // Uses an unchecked transaction for massive performance gains during inserts
         let tx = conn.unchecked_transaction()?;
@@ -150,12 +151,8 @@ impl EngramBuilder {
 
                     // Persist the vectors to the database
                     for (token_path, vector) in fitted_tokens {
-                        let record = EngramRecord::builder()
-                            .with_name(theme_name)
-                            .with_variant(variant.clone())
-                            .with_token_path(&token_path)
-                            .with_vector(vector)
-                            .build()?;
+                        let record =
+                            EngramRecord::new(theme_name, variant.clone(), &token_path, vector);
 
                         if let Err(e) = record.upsert(&tx) {
                             tracing::warn!("Upsert error {token_path} for {theme_name}: {e}");
@@ -169,7 +166,7 @@ impl EngramBuilder {
         }
 
         tx.commit()?;
-        conn.close().map_err(|(_, e)| KenazError::from(e))?;
+        conn.close_safely()?;
 
         tracing::info!("Engram build ended ! {total_themes} themes built and saved in database");
         Ok(())
@@ -181,67 +178,56 @@ impl EngramBuilder {
     /// downloads the raw JSON file from their respective GitHub repositories.
     /// Uses a semaphore to limit concurrent requests and avoid rate limiting.
     fn fetch_themes(&mut self) -> Result<()> {
-        use super::guard::PermitGuard;
+        use rayon::iter::ParallelIterator;
 
         // fetching official zed themes
         self.fetch_official_themes()?;
 
         let repos = self.fetcher.fetch_repos()?;
 
-        // Limit concurrent downloads to be nice to the GitHub API
-        let (tx, rx) = mpsc::sync_channel(Self::CONCURRENT_REQUESTS_LIMIT);
-        for _ in 0..Self::CONCURRENT_REQUESTS_LIMIT {
-            tx.send(()).unwrap();
-        }
-        let rx = std::sync::Arc::new(std::sync::Mutex::new(rx));
-        let tx = std::sync::Arc::new(tx);
+        let fetcher = Arc::clone(&self.fetcher);
 
-        let mut handles = Vec::new();
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(Self::CONCURRENT_REQUESTS_LIMIT)
+            .build()?;
+        let errors = pool.install(|| {
+            // here we fetch json theme files from repos list given above
+            repos
+                .data
+                .par_iter()
+                .filter_map(|repo| {
+                    let result = (|| -> Result<()> {
+                        let (theme_paths, branch) = fetcher.fetch_tree(&repo.repository)?;
 
-        // here we fetch json theme files from repos list given above
-        for repo in repos.data {
-            let rx = std::sync::Arc::clone(&rx);
-            let tx = std::sync::Arc::clone(&tx);
+                        let repo_dir = util::styles_dir().join(&repo.name);
+                        std::fs::create_dir_all(&repo_dir)?;
 
-            let fetcher = Arc::clone(&self.fetcher);
+                        for theme_path in &theme_paths {
+                            let raw_url = format!(
+                                "https://raw.githubusercontent.com/{}/{}/{}",
+                                repo.repository.trim_start_matches(GITHUB_ROOT_URL),
+                                branch,
+                                theme_path
+                            );
 
-            let handle = std::thread::spawn(move || -> Result<()> {
-                let _permit = rx.lock().unwrap().recv().unwrap();
-                let _guard = PermitGuard {
-                    tx: std::sync::Arc::clone(&tx),
-                };
+                            let content = fetcher.fetch_raw_file(&raw_url)?;
 
-                let (theme_paths, branch) = fetcher.fetch_tree(&repo.repository)?;
+                            let file_name = theme_path.rsplit('/').next().unwrap_or(theme_path);
+                            std::fs::write(repo_dir.join(file_name), content)?;
+                        }
+                        Ok(())
+                    })();
 
-                let repo_dir = util::styles_dir().join(&repo.name);
-                std::fs::create_dir_all(&repo_dir)?;
+                    if let Err(e) = result {
+                        tracing::warn!("Thread failed: {e}");
+                        Some(())
+                    } else {
+                        None
+                    }
+                })
+                .count()
+        });
 
-                for theme_path in &theme_paths {
-                    let raw_url = format!(
-                        "https://raw.githubusercontent.com/{}/{}/{}",
-                        repo.repository.trim_start_matches(GITHUB_ROOT_URL),
-                        branch,
-                        theme_path
-                    );
-
-                    let content = fetcher.fetch_raw_file(&raw_url)?;
-
-                    let file_name = theme_path.rsplit('/').next().unwrap_or(theme_path);
-                    std::fs::write(repo_dir.join(file_name), content)?;
-                }
-                Ok(())
-            });
-            handles.push(handle);
-        }
-
-        // Wait for all tasks to complete and collect results
-        let mut errors = 0;
-        for handle in handles {
-            if let Err(e) = handle.join().unwrap() {
-                tracing::warn!("Thread failed: {e}");
-                errors += 1;
-            }
-        }
         tracing::info!("Themes fetched. {errors} failures");
         Ok(())
     }

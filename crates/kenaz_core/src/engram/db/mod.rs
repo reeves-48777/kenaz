@@ -7,10 +7,21 @@
 mod record;
 mod variant;
 
-use crate::{engram::prelude::*, error::Result};
+use crate::{KenazError, engram::prelude::*, error::Result};
 
 pub mod prelude {
+    pub use super::ConnectionExt;
     pub use super::record::EngramRecord;
+}
+
+pub trait ConnectionExt {
+    fn close_safely(self) -> Result<()>;
+}
+
+impl ConnectionExt for rusqlite::Connection {
+    fn close_safely(self) -> Result<()> {
+        self.close().map_err(|(_, e)| KenazError::Database(e))
+    }
 }
 
 /// Queries the database and prints a formatted list of all available theme engrams.

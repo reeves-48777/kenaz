@@ -1,8 +1,8 @@
 //! Logic for exporting the engram database and styles into distributable archives.
 
 use crate::{
-    engram::db::prelude::EngramRecord,
-    error::{KenazError, Result},
+    engram::db::{ConnectionExt, prelude::EngramRecord},
+    error::Result,
     util,
 };
 use std::path::Path;
@@ -113,14 +113,14 @@ pub fn export_pack(source_db_path: &Path, output_archive: &Path, full: bool) -> 
     if full {
         // FIX: in full mode, we copy database file, optimisation (instant and safe)
         tracing::info!("Copying full database...");
-        source_conn.close().map_err(|(_, e)| KenazError::from(e))?;
+        source_conn.close_safely()?;
         std::fs::copy(source_db_path, &dest_db_path)?;
     } else if !theme_names_to_export.is_empty() {
         // FIX: avoid crash if empty
         let dest_conn = rusqlite::Connection::open(&dest_db_path)?;
 
         // Initialize schema in destination
-        EngramRecord::init_db(&dest_conn)?;
+        EngramRecord::create_table_if_not_exists(&dest_conn)?;
 
         let dest_db_path_str = dest_db_path.to_str().unwrap().replace("'", "''");
 
@@ -150,8 +150,8 @@ pub fn export_pack(source_db_path: &Path, output_archive: &Path, full: bool) -> 
         WHERE LOWER(theme_name) IN ({})", theme_names_sql), [])?;
 
         source_conn.execute("DETACH DATABASE dest", [])?;
-        dest_conn.close().map_err(|(_, e)| KenazError::from(e))?;
-        source_conn.close().map_err(|(_, e)| KenazError::from(e))?;
+        dest_conn.close_safely()?;
+        source_conn.close_safely()?;
     } else {
         tracing::warn!("No themes found to export to curated database");
     }

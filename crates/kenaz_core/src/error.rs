@@ -20,9 +20,6 @@ pub enum KenazError {
     #[error("Missing required anchor token '{0}' in theme")]
     MissingAnchor(String),
 
-    #[error("Missing required field in EngramRecordBuilder: {0}")]
-    MissingBuilderField(String),
-
     #[error("Invalid hex color provided: {0}")]
     InvalidHexColor(String),
 
@@ -37,6 +34,9 @@ pub enum KenazError {
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Thread pool initialization error: {0}")]
+    ThreadPool(#[from] rayon::ThreadPoolBuildError),
 
     #[error("JSON serialization/deserialization error: {0}")]
     Json(#[from] serde_json::Error),
