@@ -1,6 +1,6 @@
 [package]
 name = "kenaz_core"
-version = "1.0.4"
+version = "1.0.5"
 edition = "2024"
 build = "build.rs"
 homepage = "https://github.com/reeves-48777/kenaz"
@@ -22,6 +22,8 @@ flate2.workspace = true
 ureq = { workspace = true, optional = true }
 thiserror = "2.0.20"
 
+[dev-dependencies]
+criterion = { version = "0.8.2", features = ["html_reports"] }
 
 [build-dependencies]
 typify.workspace = true
@@ -37,3 +39,8 @@ kenaz_macros = { path = "../kenaz_macros"}
 
 [features]
 dev-tools = ["dep:dotenvy", "dep:ureq"]
+
+[[bench]]
+name = "kenaz_bench"
+harness = false
+path = "benches/bench.rs"
