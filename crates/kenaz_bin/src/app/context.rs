@@ -213,6 +213,7 @@ pub struct DevContext {
     pub action: DevActions,
 }
 
+#[cfg(feature = "dev-tools")]
 impl DevContext {
     pub fn execute(self) -> anyhow::Result<()> {
         use engram::devtools::prelude::*;
